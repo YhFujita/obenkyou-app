@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - master # ローカルのデフォルトブランチに合わせて設定（mainに変更した場合はmainに書き換えてください）
+      - main # mainブランチへのプッシュで自動デプロイを起動する
 
 permissions:
   contents: read
