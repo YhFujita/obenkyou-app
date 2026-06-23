@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import strokeDataJson from '../data/strokeData.json';
 
 const StrokeOrderCanvas = ({ targetText, onFinish }) => {
@@ -14,7 +14,6 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
   const [currentStrokeIndex, setCurrentStrokeIndex] = useState(0);
   const [completedStrokes, setCompletedStrokes] = useState([]);
   const [strokeProgress, setStrokeProgress] = useState(0);
-  const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState(null);
 
   // 自動アニメーション（お手本再生）の状態
@@ -50,9 +49,33 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
       osc.start();
       osc.stop(ctx.currentTime + 0.08);
     } catch (e) {
-      console.error(e);
+      console.error('Audio tick play failed:', e);
     }
   };
+
+  // フォールバック用背景描画 (巻き上げ可能にするため function 宣言にする)
+  function drawFallbackBackground(ctx, width, height) {
+    ctx.clearRect(0, 0, width, height);
+    ctx.beginPath();
+    ctx.setLineDash([5, 5]);
+    ctx.moveTo(width / 2, 0);
+    ctx.lineTo(width / 2, height);
+    ctx.moveTo(0, height / 2);
+    ctx.lineTo(width, height / 2);
+    ctx.strokeStyle = '#eee';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.font = `bold ${width * 0.7}px 'Kosugi Maru', sans-serif`;
+    ctx.fillStyle = '#e0e0e0';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(targetText, width / 2, height / 2);
+
+    ctx.strokeStyle = '#FF6B6B';
+    ctx.lineWidth = 12;
+  }
 
   // 文字データ（KanjiVG）のロード
   useEffect(() => {
@@ -68,7 +91,6 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
       setCompletedStrokes([]);
       setStrokeProgress(0);
       setStartPoint(null);
-      setIsDrawing(false);
       isDrawingRef.current = false;
       setIsAnimating(false);
 
@@ -152,6 +174,7 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
           svgRef.current.removeChild(path);
           return len;
         } catch (e) {
+          console.error('Error measuring stroke length:', e);
           return 150; // デフォルト値
         }
       });
@@ -168,7 +191,7 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
         const startPt = guidePathRef.current.getPointAtLength(0);
         setStartPoint(startPt);
       } catch (e) {
-        // パスが読み込み中のときはエラーになる場合がある
+        console.error('Error getting guide path start point:', e);
       }
     } else {
       setStartPoint(null);
@@ -207,7 +230,7 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
             setAnimStrokeIndex(-1);
             setAnimProgress(0);
           }
-        }, 400); // 画の間のタメ
+        }, 400); // 各画の間のウェイト
       } else {
         setAnimProgress(progress);
       }
@@ -272,11 +295,10 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
       // 始点の近く（18単位以内）をタッチしたらおなぞり開始
       if (dist < 18) {
         isDrawingRef.current = true;
-        setIsDrawing(true);
         setStrokeProgress(0);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Error starting drawing:', err);
     }
   };
 
@@ -310,7 +332,6 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
       // 指がガイドパスから離れすぎている場合 (20単位以上) はなぞり中断
       if (minDistance > 20) {
         isDrawingRef.current = false;
-        setIsDrawing(false);
         setStrokeProgress(0);
         return;
       }
@@ -325,7 +346,6 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
         // 90% 以上なぞれたら完了とする
         if (progress >= 0.9) {
           isDrawingRef.current = false; // 即座に Ref を同期的にリセット
-          setIsDrawing(false);
           setStrokeProgress(0);
           playTickSound();
           
@@ -343,7 +363,7 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
         }
       }
     } catch (err) {
-      console.error(err);
+      console.error('Error drawing stroke:', err);
     }
   };
 
@@ -351,7 +371,6 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
   const stopDrawing = () => {
     if (isDrawingRef.current) {
       isDrawingRef.current = false;
-      setIsDrawing(false);
       setStrokeProgress(0);
     }
   };
@@ -369,7 +388,6 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
       setCurrentStrokeIndex(0);
       setCompletedStrokes([]);
       setStrokeProgress(0);
-      setIsDrawing(false);
       isDrawingRef.current = false;
       setIsAnimating(false);
       if (animIntervalRef.current) clearInterval(animIntervalRef.current);
@@ -396,30 +414,8 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
 
       drawFallbackBackground(ctx, rect.width, rect.height);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useFallbackText, targetText]);
-
-  const drawFallbackBackground = (ctx, width, height) => {
-    ctx.clearRect(0, 0, width, height);
-    ctx.beginPath();
-    ctx.setLineDash([5, 5]);
-    ctx.moveTo(width / 2, 0);
-    ctx.lineTo(width / 2, height);
-    ctx.moveTo(0, height / 2);
-    ctx.lineTo(width, height / 2);
-    ctx.strokeStyle = '#eee';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.font = `bold ${width * 0.7}px 'Kosugi Maru', sans-serif`;
-    ctx.fillStyle = '#e0e0e0';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(targetText, width / 2, height / 2);
-
-    ctx.strokeStyle = '#FF6B6B';
-    ctx.lineWidth = 12;
-  };
 
   const getFallbackCoords = (e) => {
     const canvas = canvasRef.current;

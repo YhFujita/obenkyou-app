@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CharacterSVG } from '../CharacterSVG';
 import { db } from '../db';
@@ -62,6 +62,7 @@ const Home = () => {
           alert('データのふくげんにしっぱいしました。ファイルがただしいか確認してください。');
         }
       } catch (err) {
+        console.error('Import error:', err);
         alert('ファイルのよみこみにしっぱいしました。ただしいバックアップファイルを選択してください。');
       }
     };

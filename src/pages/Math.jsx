@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CharacterSVG } from '../CharacterSVG';
 import { playCorrectSound, playIncorrectSound, playFinishSound } from '../audio';
@@ -42,7 +42,10 @@ const MathPage = () => {
   };
 
   useEffect(() => {
-    generateQuestion();
+    const timer = setTimeout(() => {
+      generateQuestion();
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleAnswer = async (selected) => {

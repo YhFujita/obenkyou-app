@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 
 const DrawingCanvas = ({ targetText, onFinish }) => {
   const canvasRef = useRef(null);
@@ -26,7 +26,7 @@ const DrawingCanvas = ({ targetText, onFinish }) => {
     drawBackground(ctx, rect.width, rect.height);
   }, [targetText]);
 
-  const drawBackground = (ctx, width, height) => {
+  function drawBackground(ctx, width, height) {
     ctx.clearRect(0, 0, width, height);
     // 十字線の描画
     ctx.beginPath();
@@ -51,7 +51,7 @@ const DrawingCanvas = ({ targetText, onFinish }) => {
     // 描画設定を元に戻す
     ctx.strokeStyle = '#FF6B6B'; // なぞる線の色
     ctx.lineWidth = 12;
-  };
+  }
 
   const getCoordinates = (e) => {
     const canvas = canvasRef.current;

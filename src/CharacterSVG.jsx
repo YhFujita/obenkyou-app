@@ -1,4 +1,3 @@
-import React from 'react';
 
 export const CharacterSVG = ({ type = 'normal', width = 120, height = 120 }) => {
   // 表情や状態によってSVGを出し分ける軽量なキャラクター実装

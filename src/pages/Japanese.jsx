@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StrokeOrderCanvas from '../components/StrokeOrderCanvas';
 import { CharacterSVG } from '../CharacterSVG';
@@ -316,7 +316,6 @@ const Japanese = () => {
             let btnBorder = '2px solid #e2e8f0';
             let btnColor = '#475569';
             let btnShadow = 'none';
-            let animation = 'none';
             let cursor = 'pointer';
 
             if (isCompleted) {
@@ -328,7 +327,6 @@ const Japanese = () => {
               btnBorder = '3px solid #FFE66D';
               btnColor = '#B25E00';
               btnShadow = '0 0 12px rgba(255, 230, 109, 0.8)';
-              animation = 'pulse-active 1.5s infinite alternate';
             } else if (isLocked) {
               btnBg = '#f1f5f9';
               btnBorder = '2px dashed #cbd5e1';
