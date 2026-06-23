@@ -4,7 +4,7 @@ import StrokeOrderCanvas from '../components/StrokeOrderCanvas';
 import { CharacterSVG } from '../CharacterSVG';
 import { playCorrectSound, playFinishSound } from '../audio';
 import { db } from '../db';
-import { hiraganaList, katakanaList, kanjiList } from '../data/charList';
+import { hiraganaList, katakanaList, kanjiList, kanjiDetails } from '../data/charList';
 
 const Japanese = () => {
   const navigate = useNavigate();
@@ -430,6 +430,37 @@ const Japanese = () => {
             {playMode === 'game' ? '🎮 ステップアップ' : '🔍 えらんで練習'}
           </div>
         </div>
+
+        {/* 読み方の表示 */}
+        {category === 'kanji' && kanjiDetails[activeChar] && (
+          <div 
+            style={{ 
+              background: 'white', 
+              border: '2px solid #e2e8f0', 
+              borderRadius: '16px', 
+              padding: '10px 20px', 
+              margin: '0 auto 15px auto', 
+              maxWidth: '320px',
+              display: 'flex', 
+              justifyContent: 'center',
+              gap: '20px',
+              fontSize: '0.95rem',
+              color: '#334155',
+              boxShadow: '0 4px 10px rgba(0,0,0,0.02)'
+            }}
+          >
+            {kanjiDetails[activeChar].kunyomi && (
+              <div>
+                <span style={{ fontWeight: 'bold', color: '#FF6B6B' }}>くんよみ:</span> {kanjiDetails[activeChar].kunyomi}
+              </div>
+            )}
+            {kanjiDetails[activeChar].onyomi && (
+              <div>
+                <span style={{ fontWeight: 'bold', color: '#4ECDC4' }}>おんよみ:</span> {kanjiDetails[activeChar].onyomi}
+              </div>
+            )}
+          </div>
+        )}
 
         <StrokeOrderCanvas 
           targetText={activeChar} 
