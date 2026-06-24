@@ -52,6 +52,7 @@ const Japanese = () => {
   const [grammarIndex, setGrammarIndex] = useState(0);
   const [grammarScore, setGrammarScore] = useState(0);
   const [grammarCharState, setGrammarCharState] = useState('normal');
+  const [selectedGrammarAnswer, setSelectedGrammarAnswer] = useState(null);
 
   // --- てがきであなうめ（handwriting）の状態 ---
   const [handwritingQuizzes, setHandwritingQuizzes] = useState([]);
@@ -91,6 +92,7 @@ const Japanese = () => {
     setGrammarIndex(0);
     setGrammarScore(0);
     setGrammarCharState('normal');
+    setSelectedGrammarAnswer(null);
     setStudyMenu('grammar');
   };
 
@@ -181,6 +183,8 @@ const Japanese = () => {
   // 2. ことばのクイズ：回答処理
   const handleGrammarAnswer = (selected) => {
     const currentQ = grammarQuizzes[grammarIndex];
+    setSelectedGrammarAnswer(selected);
+
     if (selected === currentQ.answer) {
       playCorrectSound();
       setGrammarScore(s => s + 10);
@@ -191,6 +195,7 @@ const Japanese = () => {
     }
 
     setTimeout(async () => {
+      setSelectedGrammarAnswer(null); // 回答状態をクリア
       if (grammarIndex < 4) {
         setGrammarIndex(i => i + 1);
         setGrammarCharState('normal');
@@ -711,7 +716,7 @@ const Japanese = () => {
             fontFamily: "'Kosugi Maru', sans-serif"
           }}
         >
-          {currentQ.sentence}
+          {currentQ.sentence.replace(' 　 ', selectedGrammarAnswer || ' 　 ')}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginTop: '30px' }}>
@@ -728,6 +733,7 @@ const Japanese = () => {
                 padding: '12px 0'
               }}
               onClick={() => handleGrammarAnswer(opt)}
+              disabled={selectedGrammarAnswer !== null}
             >
               {opt}
             </button>
