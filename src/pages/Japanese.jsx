@@ -437,26 +437,54 @@ const Japanese = () => {
             style={{ 
               background: 'white', 
               border: '2px solid #e2e8f0', 
-              borderRadius: '16px', 
-              padding: '10px 20px', 
+              borderRadius: '24px', 
+              padding: '16px 20px', 
               margin: '0 auto 15px auto', 
-              maxWidth: '320px',
+              maxWidth: '350px',
               display: 'flex', 
-              justifyContent: 'center',
-              gap: '20px',
+              flexDirection: 'column',
+              gap: '12px',
               fontSize: '0.95rem',
               color: '#334155',
-              boxShadow: '0 4px 10px rgba(0,0,0,0.02)'
+              boxShadow: '0 8px 16px rgba(0,0,0,0.03)'
             }}
           >
-            {kanjiDetails[activeChar].kunyomi && (
-              <div>
-                <span style={{ fontWeight: 'bold', color: '#FF6B6B' }}>くんよみ:</span> {kanjiDetails[activeChar].kunyomi}
-              </div>
-            )}
-            {kanjiDetails[activeChar].onyomi && (
-              <div>
-                <span style={{ fontWeight: 'bold', color: '#4ECDC4' }}>おんよみ:</span> {kanjiDetails[activeChar].onyomi}
+            {/* 音・訓読み */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '25px', borderBottom: '1px dashed #e2e8f0', paddingBottom: '8px' }}>
+              {kanjiDetails[activeChar].kunyomi && (
+                <div>
+                  <span style={{ fontWeight: 'bold', color: '#FF6B6B' }}>くんよみ:</span> {kanjiDetails[activeChar].kunyomi}
+                </div>
+              )}
+              {kanjiDetails[activeChar].onyomi && (
+                <div>
+                  <span style={{ fontWeight: 'bold', color: '#4ECDC4' }}>おんよみ:</span> {kanjiDetails[activeChar].onyomi}
+                </div>
+              )}
+            </div>
+            
+            {/* 例文 */}
+            {kanjiDetails[activeChar].examples && kanjiDetails[activeChar].examples.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#64748b', alignSelf: 'flex-start' }}>✏️ つかいかたの れい:</span>
+                {kanjiDetails[activeChar].examples.map((ex, i) => (
+                  <div 
+                    key={i} 
+                    style={{ 
+                      background: '#f8fafc', 
+                      padding: '6px 12px', 
+                      borderRadius: '8px', 
+                      width: '100%', 
+                      fontSize: '0.9rem', 
+                      fontWeight: 'bold',
+                      color: '#475569',
+                      borderLeft: '3px solid #FFD166',
+                      textAlign: 'left'
+                    }}
+                  >
+                    {ex}
+                  </div>
+                ))}
               </div>
             )}
           </div>
