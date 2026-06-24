@@ -138,8 +138,10 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
           options: 'enable_pre_space',
           requests: [
             {
-              writing_area_width: 300,
-              writing_area_height: 300,
+              writing_guide: {
+                writing_area_width: 300,
+                writing_area_height: 300
+              },
               ink: relativeInk,
               language: 'ja'
             }
