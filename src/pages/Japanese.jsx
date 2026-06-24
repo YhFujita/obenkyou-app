@@ -847,7 +847,7 @@ const Japanese = () => {
             fontFamily: "'Kosugi Maru', sans-serif"
           }}
         >
-          {currentQ.sentence.replace(' 　 ', selectedGrammarAnswer || ' 　 ')}
+          {currentQ.sentence.replace(' 　 ', selectedGrammarAnswer ? ` ${selectedGrammarAnswer} ` : ' 　 ')}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginTop: '30px' }}>
