@@ -518,15 +518,44 @@ const Japanese = () => {
             {/* 花丸 */}
             <div 
               style={{
-                width: '140px',
-                height: '140px',
-                backgroundImage: 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M50 10 C30 10, 10 30, 20 50 C10 70, 30 90, 50 90 C70 90, 90 70, 80 50 C90 30, 70 10, 50 10 Z" fill="none" stroke="%23ff3366" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="50" r="33" fill="none" stroke="%23ff3366" stroke-width="5"/><text x="50" y="55" font-size="16" font-family="sans-serif" font-weight="bold" fill="%23ff3366" text-anchor="middle">たいへんよくできました</text></svg>\')',
-                backgroundSize: 'contain',
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'center',
+                width: '150px',
+                height: '150px',
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 animation: 'success-pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
               }}
-            />
+            >
+              {/* 高精度なはなまるSVG */}
+              <svg viewBox="0 0 120 120" width="100%" height="100%">
+                <path 
+                  d="M 60,8 C 53,8 50,20 45,22 C 37,25 31,14 24,19 C 18,24 25,34 22,41 C 20,49 8,53 8,60 C 8,67 20,71 22,79 C 25,86 18,96 24,101 C 31,106 37,95 45,98 C 50,100 53,112 60,112 C 67,112 70,100 75,98 C 83,95 89,106 96,101 C 102,96 95,86 98,79 C 100,71 112,67 112,60 C 112,53 100,49 98,41 C 95,34 102,24 96,19 C 89,14 83,25 75,22 C 70,20 67,8 60,8 Z" 
+                  fill="none" 
+                  stroke="#FF3366" 
+                  strokeWidth="5.5" 
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <circle cx="60" cy="60" r="32" fill="none" stroke="#FF3366" strokeWidth="4.5" />
+              </svg>
+              {/* 文字の絶対配置（中央・白フチ付き） */}
+              <div 
+                style={{
+                  position: 'absolute',
+                  fontSize: '0.85rem',
+                  fontWeight: '900',
+                  color: '#FF3366',
+                  textAlign: 'center',
+                  width: '90px',
+                  lineHeight: '1.35',
+                  fontFamily: "'Kosugi Maru', sans-serif",
+                  textShadow: '2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 0 2px 0 #fff, 2px 0 0 #fff, 0 -2px 0 #fff, -2px 0 0 #fff'
+                }}
+              >
+                たいへん<br />よくできました
+              </div>
+            </div>
 
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               <CharacterSVG type="happy" width={90} height={90} />
