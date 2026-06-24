@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import strokeDataJson from '../data/strokeData.json';
+import { db } from '../db';
 
 const StrokeOrderCanvas = ({ targetText, onFinish }) => {
   const [strokes, setStrokes] = useState([]);
@@ -104,7 +105,20 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
         return;
       }
 
-      // 2. なければオンラインからフェッチを試みる
+      // 2. IndexedDBキャッシュを確認
+      try {
+        const cached = await db.getCachedStroke(targetText);
+        if (cached && active) {
+          setStrokes(cached.paths);
+          setNumbers(cached.numbers);
+          setLoading(false);
+          return;
+        }
+      } catch (cacheErr) {
+        console.warn('Failed to read stroke cache:', cacheErr);
+      }
+
+      // 3. なければオンラインからフェッチを試みる
       try {
         const codePoint = targetText.codePointAt(0).toString(16).padStart(5, '0');
         const url = `https://cdn.jsdelivr.net/gh/kanjivg/kanjivg@master/kanji/${codePoint}.svg`;
@@ -137,6 +151,8 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
           if (paths.length > 0) {
             setStrokes(paths);
             setNumbers(numbersData);
+            // オンラインからフェッチしたデータをIndexedDBにキャッシュ保存
+            await db.saveCachedStroke(targetText, { paths, numbers: numbersData });
           } else {
             throw new Error('No paths found');
           }

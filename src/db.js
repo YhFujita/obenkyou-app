@@ -242,5 +242,25 @@ export const db = {
       console.error('Error importing backup:', err);
       return false;
     }
+  },
+
+  // なぞり書きパスデータのキャッシュ取得
+  async getCachedStroke(char) {
+    try {
+      const cached = await localforage.getItem(`stroke_${char}`);
+      return cached; // { paths, numbers } or null
+    } catch (err) {
+      console.error('Error fetching cached stroke:', err);
+      return null;
+    }
+  },
+
+  // なぞり書きパスデータのキャッシュ保存
+  async saveCachedStroke(char, data) {
+    try {
+      await localforage.setItem(`stroke_${char}`, data);
+    } catch (err) {
+      console.error('Error saving cached stroke:', err);
+    }
   }
 };
