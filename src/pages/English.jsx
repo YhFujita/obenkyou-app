@@ -4,18 +4,40 @@ import { CharacterSVG } from '../CharacterSVG';
 import { playFinishSound } from '../audio';
 import { db } from '../db';
 
+const allFlashcards = [
+  { word: 'Apple', meaning: 'りんご', emoji: '🍎' },
+  { word: 'Dog', meaning: 'いぬ', emoji: '🐶' },
+  { word: 'Cat', meaning: 'ねこ', emoji: '🐱' },
+  { word: 'Sun', meaning: 'たいよう', emoji: '☀️' },
+  { word: 'Water', meaning: 'みず', emoji: '💧' },
+  { word: 'Bird', meaning: 'とり', emoji: '🐦' },
+  { word: 'Fish', meaning: 'さかな', emoji: '🐟' },
+  { word: 'Flower', meaning: 'はな', emoji: '🌸' },
+  { word: 'Tree', meaning: 'き', emoji: '🌳' },
+  { word: 'Book', meaning: 'ほん', emoji: '📖' },
+  { word: 'Pencil', meaning: 'えんぴつ', emoji: '✏️' },
+  { word: 'Car', meaning: 'くるま', emoji: '🚗' },
+  { word: 'Train', meaning: 'でんしゃ', emoji: '🚃' },
+  { word: 'Bus', meaning: 'ばす', emoji: '🚌' },
+  { word: 'House', meaning: 'いえ', emoji: '🏠' },
+  { word: 'Star', meaning: 'ほし', emoji: '⭐' },
+  { word: 'Moon', meaning: 'つき', emoji: '🌙' },
+  { word: 'Cloud', meaning: 'くも', emoji: '☁️' },
+  { word: 'Rain', meaning: 'あめ', emoji: '🌧️' },
+  { word: 'Snow', meaning: 'ゆき', emoji: '⛄' },
+  { word: 'Fire', meaning: 'ひ', emoji: '🔥' },
+  { word: 'Hand', meaning: 'て', emoji: '🖐️' },
+  { word: 'Eye', meaning: 'め', emoji: '👁️' },
+  { word: 'Ear', meaning: 'みみ', emoji: '👂' },
+  { word: 'Mouth', meaning: 'くち', emoji: '👄' }
+];
+
 const English = () => {
   const navigate = useNavigate();
+  // 初期化時にランダムに選ぶように変更
+  const [flashcards] = useState(() => [...allFlashcards].sort(() => Math.random() - 0.5).slice(0, 10));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
-
-  const flashcards = [
-    { word: 'Apple', meaning: 'りんご', emoji: '🍎' },
-    { word: 'Dog', meaning: 'いぬ', emoji: '🐶' },
-    { word: 'Cat', meaning: 'ねこ', emoji: '🐱' },
-    { word: 'Sun', meaning: 'たいよう', emoji: '☀️' },
-    { word: 'Water', meaning: 'みず', emoji: '💧' },
-  ];
 
   const playVoice = (text) => {
     if ('speechSynthesis' in window) {
@@ -28,7 +50,9 @@ const English = () => {
 
   useEffect(() => {
     // 最初のカードの音声を再生
-    playVoice(flashcards[0].word);
+    if (flashcards.length > 0) {
+      playVoice(flashcards[0].word);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

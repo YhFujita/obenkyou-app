@@ -1,54 +1,42 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CharacterSVG } from '../CharacterSVG';
 import { playCorrectSound, playIncorrectSound, playFinishSound } from '../audio';
 import { db } from '../db';
 
+// クイズの全プール
+const allQuizzes = [
+  { q: 'この おはな の なまえは なにかな？', img: '/images/nature/himawari.webp', options: ['あさがお', 'ひまわり', 'さくら'], answer: 'ひまわり' },
+  { q: 'この むし の なまえは なにかな？', img: '/images/nature/kabutomushi.webp', options: ['かぶとむし', 'くわがた', 'てんとうむし'], answer: 'かぶとむし' },
+  { q: 'はる に さく きれいな おはな は どれ？', img: '/images/nature/sakura.webp', options: ['ちゅーりっぷ', 'さくら', 'たんぽぽ'], answer: 'さくら' },
+  { q: 'この きれいな むし の なまえは なにかな？', img: '/images/nature/chocho.webp', options: ['とんぼ', 'ちょうちょ', 'はち'], answer: 'ちょうちょ' },
+  { q: 'なつ に さく この おはな の なまえは？', img: '/images/nature/asagao.webp', options: ['ひまわり', 'あさがお', 'ゆり'], answer: 'あさがお' },
+  { q: 'かっこいい この むし の なまえは？', img: '/images/nature/kamakiri.webp', options: ['かまきり', 'ばった', 'せみ'], answer: 'かまきり' },
+  { q: 'はる に さく かわいい おはな の なまえは？', img: '/images/nature/tulip.webp', options: ['さくら', 'ちゅーりっぷ', 'ひまわり'], answer: 'ちゅーりっぷ' },
+  { q: 'わたげ が とぶ この おはな は？', img: '/images/nature/tanpopo.webp', options: ['たんぽぽ', 'ひまわり', 'あさがお'], answer: 'たんぽぽ' },
+  { q: 'きれい で いい におい が する おはな は？', img: '/images/nature/rose.webp', options: ['ばら', 'ゆり', 'すずらん'], answer: 'ばら' },
+  { q: 'ははのひ に わたす おはな の なまえは？', img: '/images/nature/carnation.webp', options: ['かーねーしょん', 'ちゅーりっぷ', 'ばら'], answer: 'かーねーしょん' },
+  { q: 'しろく て おおきな この おはな は？', img: '/images/nature/lily.webp', options: ['ゆり', 'すずらん', 'こすもす'], answer: 'ゆり' },
+  { q: 'ちいさく て かわいい この おはな は？', img: '/images/nature/suzuran.webp', options: ['すずらん', 'たんぽぽ', 'ゆり'], answer: 'すずらん' },
+  { q: 'あめ の ひ に きれい に さく おはな は？', img: '/images/nature/ajisai.webp', options: ['あじさい', 'あさがお', 'さくら'], answer: 'あじさい' },
+  { q: 'あき に なると さく おはな の なまえは？', img: '/images/nature/cosmos.webp', options: ['こすもす', 'ひまわり', 'たんぽぽ'], answer: 'こすもす' },
+  { q: 'いろんな いろ が ある この おはな は？', img: '/images/nature/pansy.webp', options: ['ぱんじー', 'ばら', 'あじさい'], answer: 'ぱんじー' },
+  { q: 'はる の はじめ に さく おはな は？', img: '/images/nature/ume.webp', options: ['うめ', 'さくら', 'ちゅーりっぷ'], answer: 'うめ' }
+];
+
 const NatureQuiz = () => {
   const navigate = useNavigate();
+  const [quizzes, setQuizzes] = useState([]);
   const [score, setScore] = useState(0);
   const [questionCount, setQuestionCount] = useState(0);
   const [characterState, setCharacterState] = useState('normal');
   const [showImageError, setShowImageError] = useState(false);
 
-  const quizzes = [
-    {
-      q: 'この おはな の なまえは なにかな？',
-      img: '/images/nature/himawari.webp',
-      options: ['あさがお', 'ひまわり', 'さくら'],
-      answer: 'ひまわり'
-    },
-    {
-      q: 'この むし の なまえは なにかな？',
-      img: '/images/nature/kabutomushi.webp',
-      options: ['かぶとむし', 'くわがた', 'てんとうむし'],
-      answer: 'かぶとむし'
-    },
-    {
-      q: 'はる に さく きれいな おはな は どれ？',
-      img: '/images/nature/sakura.webp',
-      options: ['ちゅーりっぷ', 'さくら', 'たんぽぽ'],
-      answer: 'さくら'
-    },
-    {
-      q: 'この きれいな むし の なまえは なにかな？',
-      img: '/images/nature/chocho.webp',
-      options: ['とんぼ', 'ちょうちょ', 'はち'],
-      answer: 'ちょうちょ'
-    },
-    {
-      q: 'なつ に さく この おはな の なまえは？',
-      img: '/images/nature/asagao.webp',
-      options: ['ひまわり', 'あさがお', 'ゆり'],
-      answer: 'あさがお'
-    },
-    {
-      q: 'かっこいい この むし の なまえは？',
-      img: '/images/nature/kamakiri.webp',
-      options: ['かまきり', 'ばった', 'せみ'],
-      answer: 'かまきり'
-    }
-  ];
+  useEffect(() => {
+    // ランダムに5問を選ぶ
+    const shuffled = [...allQuizzes].sort(() => Math.random() - 0.5).slice(0, 5);
+    setQuizzes(shuffled);
+  }, []);
 
   const handleAnswer = async (selected) => {
     const currentQ = quizzes[questionCount];
@@ -75,6 +63,8 @@ const NatureQuiz = () => {
       }
     }, 1500);
   };
+
+  if (quizzes.length === 0) return null;
 
   const currentQuiz = quizzes[questionCount];
 

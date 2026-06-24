@@ -16,22 +16,39 @@ const grammarQuizzesPool = [
   { sentence: 'いぬ［ 　 ］はしっています。', options: ['が', 'を', 'に'], answer: 'が' },
   { sentence: 'つくえの［ 　 ］に えんぴつがあります。', options: ['うえ', 'した', 'なか'], answer: 'うえ' },
   { sentence: 'あめ［ 　 ］ふっています。', options: ['が', 'を', 'へ'], answer: 'が' },
-  { sentence: 'ねこ［ 　 ］こっちを みています。', options: ['が', 'を', 'に'], answer: 'が' }
+  { sentence: 'ねこ［ 　 ］こっちを みています。', options: ['が', 'を', 'に'], answer: 'が' },
+  { sentence: 'おちゃ［ 　 ］のみます。', options: ['を', 'に', 'は'], answer: 'を' },
+  { sentence: 'くるま［ 　 ］のります。', options: ['に', 'を', 'へ'], answer: 'に' },
+  { sentence: 'きのう［ 　 ］いきました。', options: ['は', 'が', 'を'], answer: 'は' },
+  { sentence: 'はな［ 　 ］さきました。', options: ['が', 'を', 'へ'], answer: 'が' },
+  { sentence: 'えき［ 　 ］あるきます。', options: ['まで', 'から', 'が'], answer: 'まで' },
+  { sentence: 'かばん［ 　 ］あけます。', options: ['を', 'が', 'と'], answer: 'を' },
+  { sentence: 'おとうと［ 　 ］ほんをよむ。', options: ['に', 'を', 'が'], answer: 'に' },
+  { sentence: 'りんご［ 　 ］みかんをかう。', options: ['と', 'を', 'が'], answer: 'と' },
+  { sentence: 'せんせい［ 　 ］ききます。', options: ['に', 'を', 'は'], answer: 'に' },
+  { sentence: 'こうえん［ 　 ］あそぶ。', options: ['で', 'を', 'に'], answer: 'で' },
+  { sentence: 'え［ 　 ］かきます。', options: ['を', 'が', 'に'], answer: 'を' },
+  { sentence: 'そら［ 　 ］とぶ。', options: ['を', 'が', 'と'], answer: 'を' }
 ];
 
 // 手書き文字認識 穴埋めクイズの問題（ここからランダムに5問出題）
 const handwritingQuizzesPool = [
   { textBefore: 'これ', textAfter: 'ください。', answer: 'を', hint: '「これ（を）ください」の『を』を書いてね！' },
   { textBefore: 'わたし', textAfter: 'いちねんせいです。', answer: 'は', hint: '「わたし（は）いちねんせいです」の『は』を書いてね！' },
-  { textBefore: 'ねこ', textAfter: 'います。', answer: 'gが', hint: '「ねこ（が）います」の『が』を書いてね！' }, // 「が」に後ほど補正
+  { textBefore: 'ねこ', textAfter: 'います。', answer: 'が', hint: '「ねこ（が）います」の『が』を書いてね！' },
   { textBefore: 'こうえん', textAfter: 'あそびます。', answer: 'で', hint: '「こうえんで あそびます」の『で』を書いてね！' },
   { textBefore: 'おとうと', textAfter: 'あめを あげる。', answer: 'に', hint: '「おとうと（に）あめを あげる」の『に』を書いてね！' },
   { textBefore: 'えんぴつ', textAfter: 'かきます。', answer: 'で', hint: '「えんぴつ（で）かきます」の『で』を書いてね！' },
-  { textBefore: 'ほん', textAfter: 'よみます。', answer: 'を', hint: '「ほん（を）よみます」の『を』を書いてね！' }
+  { textBefore: 'ほん', textAfter: 'よみます。', answer: 'を', hint: '「ほん（を）よみます」の『を』を書いてね！' },
+  { textBefore: 'ともだち', textAfter: 'あそぶ。', answer: 'と', hint: '「ともだち（と）あそぶ」の『と』を書いてね！' },
+  { textBefore: 'がっこう', textAfter: 'いく。', answer: 'へ', hint: '「がっこう（へ）いく」の『へ』を書いてね！' },
+  { textBefore: 'いぬ', textAfter: 'はしる。', answer: 'が', hint: '「いぬ（が）はしる」の『が』を書いてね！' },
+  { textBefore: 'テレビ', textAfter: 'みる。', answer: 'を', hint: '「テレビ（を）みる」の『を』を書いてね！' },
+  { textBefore: 'きのう', textAfter: 'あめでした。', answer: 'は', hint: '「きのう（は）あめでした」の『は』を書いてね！' },
+  { textBefore: 'うみ', textAfter: 'およぐ。', answer: 'で', hint: '「うみ（で）およぐ」の『で』を書いてね！' },
+  { textBefore: 'ごはん', textAfter: 'たべる。', answer: 'を', hint: '「ごはん（を）たべる」の『を』を書いてね！' },
+  { textBefore: 'あめ', textAfter: 'ふっている。', answer: 'が', hint: '「あめ（が）ふっている」の『が』を書いてね！' }
 ];
-
-// タイプミス補正
-handwritingQuizzesPool[2].answer = 'が';
 
 const Japanese = () => {
   const navigate = useNavigate();
