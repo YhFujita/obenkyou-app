@@ -151,7 +151,9 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
 
       const data = await response.json();
       if (data[0] === 'SUCCESS') {
-        const candidates = data[1][0].candidates || [];
+        // APIのレスポンスは [ "SUCCESS", [ [ "文字列", [ "は", "ほ", "け", ... ], ... ] ] ] という配列形式です。
+        // data[1][0][1] に認識された候補の配列が入っています。
+        const candidates = data[1][0][1] || [];
         console.log('Handwriting recognized candidates:', candidates);
         
         // 候補の先頭3つの中に正解の文字（ひらがな）が含まれているかチェック
