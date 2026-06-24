@@ -14,7 +14,7 @@ const grammarQuizzesPool = [
   { sentence: 'ともだち［ 　 ］あそびます。', options: ['と', 'へ', 'を'], answer: 'と' },
   { sentence: 'がっこう［ 　 ］いきます。', options: ['へ', 'を', 'が'], answer: 'へ' },
   { sentence: 'いぬ［ 　 ］はしっています。', options: ['が', 'を', 'に'], answer: 'が' },
-  { sentence: 'つくえの［ 　 ］に えんぴつがあります。', options: ['うえ', 'した', 'なか'], answer: 'うえ' },
+  { sentence: 'つくえ［ 　 ］うえに えんぴつがあります。', options: ['の', 'を', 'に'], answer: 'の' },
   { sentence: 'あめ［ 　 ］ふっています。', options: ['が', 'を', 'へ'], answer: 'が' },
   { sentence: 'ねこ［ 　 ］こっちを みています。', options: ['が', 'を', 'に'], answer: 'が' },
   { sentence: 'おちゃ［ 　 ］のみます。', options: ['を', 'に', 'は'], answer: 'を' },
