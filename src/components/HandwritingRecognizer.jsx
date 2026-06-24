@@ -109,6 +109,20 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
 
     setLoading(true);
     try {
+      // タイムスタンプ t を最初の点を基準(0ms)とする相対時間（経過ミリ秒）に変換します。
+      // 絶対時間のままだと、APIがストローク間隔を正しく処理できず認識に失敗する原因になります。
+      let firstTime = null;
+      const relativeInk = ink.map(stroke => {
+        const xs = stroke[0];
+        const ys = stroke[1];
+        const ts = stroke[2];
+        if (firstTime === null && ts.length > 0) {
+          firstTime = ts[0];
+        }
+        const newTs = ts.map(t => (firstTime !== null ? t - firstTime : 0));
+        return [xs, ys, newTs];
+      });
+
       const response = await fetch('https://inputtools.google.com/request?itc=ja-t-i0-handwrit&num=5', {
         method: 'POST',
         headers: {
@@ -124,7 +138,7 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
             {
               writing_area_width: 300,
               writing_area_height: 300,
-              ink: ink,
+              ink: relativeInk,
               language: 'ja'
             }
           ]
@@ -163,12 +177,6 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', width: '100%' }}>
-      {hintText && (
-        <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 'bold', background: '#f1f5f9', padding: '6px 12px', borderRadius: '8px', textAlign: 'center' }}>
-          💡 {hintText}
-        </div>
-      )}
-      
       <div 
         style={{
           width: '280px',

@@ -797,7 +797,7 @@ const Japanese = () => {
               fontSize: '1.6rem'
             }}
           >
-            {handwritingResult === 'correct' ? currentQ.answer : (recognizedChar || ' ')}
+            {handwritingResult === 'correct' ? currentQ.answer : (recognizedChar || '？')}
           </span>
           <span>{currentQ.textAfter}</span>
         </div>
@@ -806,7 +806,6 @@ const Japanese = () => {
         {handwritingResult === null ? (
           <HandwritingRecognizer 
             expectedAnswer={currentQ.answer}
-            hintText={currentQ.hint}
             onResult={handleHandwritingResult}
           />
         ) : (
