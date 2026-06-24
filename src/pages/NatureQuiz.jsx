@@ -87,7 +87,7 @@ const NatureQuiz = () => {
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
         {!showImageError ? (
           <img 
-            src={currentQuiz.img} 
+            src={`${import.meta.env.BASE_URL}${currentQuiz.img.replace(/^\//, '')}`} 
             alt="クイズの画像" 
             style={{ 
               maxWidth: '100%', 
