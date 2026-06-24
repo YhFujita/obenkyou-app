@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CharacterSVG } from '../CharacterSVG';
 import { db } from '../db';
-import { auth, googleProvider, signInWithPopup, signOut } from '../firebase';
+import { auth, googleProvider, signInWithRedirect, signOut } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 const Home = () => {
@@ -41,7 +41,7 @@ const Home = () => {
 
   const handleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithRedirect(auth, googleProvider);
     } catch (err) {
       console.error('Login failed:', err);
       alert('ログインに失敗しました。');
