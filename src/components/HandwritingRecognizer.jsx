@@ -1,0 +1,245 @@
+import { useRef, useState, useEffect } from 'react';
+
+const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
+  const canvasRef = useRef(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [ink, setInk] = useState([]);
+  const [currentStroke, setCurrentStroke] = useState([[], [], []]); // [ [x], [y], [t] ]
+  const [loading, setLoading] = useState(false);
+  const ctxRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = '#1E3E62'; // 濃紺の鉛筆カラー
+    ctxRef.current = ctx;
+
+    drawBackground(ctx, rect.width, rect.height);
+  }, []);
+
+  function drawBackground(ctx, width, height) {
+    ctx.clearRect(0, 0, width, height);
+    // 薄いグレーの点線枠（書き込みガイド）
+    ctx.beginPath();
+    ctx.rect(10, 10, width - 20, height - 20);
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // 中央の十字線
+    ctx.beginPath();
+    ctx.moveTo(width / 2, 10);
+    ctx.lineTo(width / 2, height - 10);
+    ctx.moveTo(10, height / 2);
+    ctx.lineTo(width - 10, height / 2);
+    ctx.strokeStyle = '#f1f5f9';
+    ctx.stroke();
+
+    ctx.strokeStyle = '#1E3E62';
+    ctx.lineWidth = 10;
+  }
+
+  const getCoords = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
+  };
+
+  const startDrawing = (e) => {
+    e.preventDefault();
+    if (loading) return;
+    const { x, y } = getCoords(e);
+    const t = Date.now();
+
+    ctxRef.current.beginPath();
+    ctxRef.current.moveTo(x, y);
+
+    setCurrentStroke([[x], [y], [t]]);
+    setIsDrawing(true);
+  };
+
+  const draw = (e) => {
+    e.preventDefault();
+    if (!isDrawing || loading) return;
+    const { x, y } = getCoords(e);
+    const t = Date.now();
+
+    ctxRef.current.lineTo(x, y);
+    ctxRef.current.stroke();
+
+    // インクデータを構築
+    const nextStroke = [
+      [...currentStroke[0], Math.round(x)],
+      [...currentStroke[1], Math.round(y)],
+      [...currentStroke[2], t]
+    ];
+    setCurrentStroke(nextStroke);
+  };
+
+  const stopDrawing = () => {
+    if (isDrawing) {
+      setIsDrawing(false);
+      setInk([...ink, currentStroke]);
+    }
+  };
+
+  // 文字の判定処理を呼び出す
+  const handleCheck = async () => {
+    if (ink.length === 0) {
+      alert('四角の中に 文字を 書いてね！');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch('https://inputtools.google.com/request?itc=ja-t-i0-handwrit&num=5', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          app_version: 0.4,
+          api_level: '53.0.0',
+          device: 'pc',
+          input_type: '0',
+          options: 'enable_pre_space',
+          requests: [
+            {
+              writing_area_width: 300,
+              writing_area_height: 300,
+              ink: ink,
+              language: 'ja'
+            }
+          ]
+        })
+      });
+
+      const data = await response.json();
+      if (data[0] === 'SUCCESS') {
+        const candidates = data[1][0].candidates || [];
+        console.log('Handwriting recognized candidates:', candidates);
+        
+        // 候補の先頭3つの中に正解の文字（ひらがな）が含まれているかチェック
+        // 子供のあいまいな書き方を考慮して、上位3つの候補でチェックする
+        const cleanCandidates = candidates.map(c => c.trim());
+        const isCorrect = cleanCandidates.slice(0, 3).includes(expectedAnswer);
+        
+        onResult(isCorrect, cleanCandidates[0] || '？');
+      } else {
+        throw new Error('Recognition failed');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('文字の読み取りに失敗しました。インターネットに繋がっているか確認してね！');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClear = () => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    drawBackground(ctxRef.current, rect.width, rect.height);
+    setInk([]);
+    setCurrentStroke([[], [], []]);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', width: '100%' }}>
+      {hintText && (
+        <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 'bold', background: '#f1f5f9', padding: '6px 12px', borderRadius: '8px', textAlign: 'center' }}>
+          💡 {hintText}
+        </div>
+      )}
+      
+      <div 
+        style={{
+          width: '280px',
+          height: '280px',
+          background: 'white',
+          borderRadius: '24px',
+          boxShadow: 'inset 0 4px 10px rgba(0,0,0,0.05), 0 8px 24px rgba(0,0,0,0.08)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          style={{ width: '100%', height: '100%', cursor: 'crosshair', touchAction: 'none' }}
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={stopDrawing}
+          onMouseOut={stopDrawing}
+          onTouchStart={startDrawing}
+          onTouchMove={draw}
+          onTouchEnd={stopDrawing}
+          onTouchCancel={stopDrawing}
+        />
+        {loading && (
+          <div 
+            style={{ 
+              position: 'absolute', 
+              top: 0, 
+              left: 0, 
+              width: '100%', 
+              height: '100%', 
+              background: 'rgba(255,255,255,0.7)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              fontSize: '1.1rem',
+              fontWeight: 'bold',
+              color: '#334155'
+            }}
+          >
+            かんがえ中... 🤔
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', gap: '15px' }}>
+        <button
+          className="btn"
+          onClick={handleClear}
+          disabled={loading}
+          style={{ background: '#f5f7fa', color: '#475569', border: '1px solid #e2e8f0', padding: '10px 20px', fontSize: '0.95rem' }}
+        >
+          やりなおし
+        </button>
+        <button
+          className="btn btn-primary"
+          onClick={handleCheck}
+          disabled={loading || ink.length === 0}
+          style={{
+            background: 'linear-gradient(135deg, #4ECDC4 0%, #2AB7CA 100%)',
+            border: 'none',
+            boxShadow: '0 4px 15px rgba(78,205,196,0.3)',
+            padding: '10px 25px',
+            fontSize: '0.95rem'
+          }}
+        >
+          できた！
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default HandwritingRecognizer;

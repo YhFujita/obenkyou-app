@@ -1,36 +1,73 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StrokeOrderCanvas from '../components/StrokeOrderCanvas';
+import HandwritingRecognizer from '../components/HandwritingRecognizer';
 import { CharacterSVG } from '../CharacterSVG';
-import { playCorrectSound, playFinishSound } from '../audio';
+import { playCorrectSound, playIncorrectSound, playFinishSound } from '../audio';
 import { db } from '../db';
 import { hiraganaList, katakanaList, kanjiList, kanjiDetails } from '../data/charList';
+
+// 接続詞クイズの問題（ここからランダムに5問出題）
+const grammarQuizzesPool = [
+  { sentence: 'これ［ 　 ］りんごです。', options: ['は', 'を', 'が'], answer: 'は' },
+  { sentence: 'ごはん［ 　 ］たべます。', options: ['は', 'を', 'に'], answer: 'を' },
+  { sentence: 'ともだち［ 　 ］あそびます。', options: ['と', 'へ', 'を'], answer: 'と' },
+  { sentence: 'がっこう［ 　 ］いきます。', options: ['へ', 'を', 'が'], answer: 'へ' },
+  { sentence: 'いぬ［ 　 ］はしっています。', options: ['が', 'を', 'に'], answer: 'が' },
+  { sentence: 'つくえの［ 　 ］に えんぴつがあります。', options: ['うえ', 'した', 'なか'], answer: 'うえ' },
+  { sentence: 'あめ［ 　 ］ふっています。', options: ['が', 'を', 'へ'], answer: 'が' },
+  { sentence: 'ねこ［ 　 ］こっちを みています。', options: ['が', 'を', 'に'], answer: 'が' }
+];
+
+// 手書き文字認識 穴埋めクイズの問題（ここからランダムに5問出題）
+const handwritingQuizzesPool = [
+  { textBefore: 'これ', textAfter: 'ください。', answer: 'を', hint: '「これ（を）ください」の『を』を書いてね！' },
+  { textBefore: 'わたし', textAfter: 'いちねんせいです。', answer: 'は', hint: '「わたし（は）いちねんせいです」の『は』を書いてね！' },
+  { textBefore: 'ねこ', textAfter: 'います。', answer: 'gが', hint: '「ねこ（が）います」の『が』を書いてね！' }, // 「が」に後ほど補正
+  { textBefore: 'こうえん', textAfter: 'あそびます。', answer: 'で', hint: '「こうえんで あそびます」の『で』を書いてね！' },
+  { textBefore: 'おとうと', textAfter: 'あめを あげる。', answer: 'に', hint: '「おとうと（に）あめを あげる」の『に』を書いてね！' },
+  { textBefore: 'えんぴつ', textAfter: 'かきます。', answer: 'で', hint: '「えんぴつ（で）かきます」の『で』を書いてね！' },
+  { textBefore: 'ほん', textAfter: 'よみます。', answer: 'を', hint: '「ほん（を）よみます」の『を』を書いてね！' }
+];
+
+// タイプミス補正
+handwritingQuizzesPool[2].answer = 'が';
 
 const Japanese = () => {
   const navigate = useNavigate();
 
-  // 画面モード: 'menu' (メニュー) または 'practice' (なぞり書き練習中)
-  const [viewMode, setViewMode] = useState('menu');
-  // カテゴリ: 'hiragana' | 'katakana' | 'kanji'
-  const [category, setCategory] = useState('hiragana');
-  // プレイモード: 'game' (ステップアップ) | 'select' (えらんで練習)
-  const [playMode, setPlayMode] = useState('game');
+  // 国語のおべんきょうメニュー: 
+  // 'select' (学習選択) | 'letters' (もじのれんしゅう) | 'grammar' (ことばのクイズ) | 'handwriting' (てがきであなうめ)
+  const [studyMenu, setStudyMenu] = useState('select');
 
-  // 練習中の文字
+  // --- もじのれんしゅう（letters）の状態 ---
+  const [lettersViewMode, setLettersViewMode] = useState('menu'); // 'menu' | 'practice'
+  const [category, setCategory] = useState('hiragana'); // 'hiragana' | 'katakana' | 'kanji'
+  const [playMode, setPlayMode] = useState('game'); // 'game' | 'select'
   const [activeChar, setActiveChar] = useState('');
-  
-  // データベースからの進行状況
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  // --- ことばのクイズ（grammar）の状態 ---
+  const [grammarQuizzes, setGrammarQuizzes] = useState([]);
+  const [grammarIndex, setGrammarIndex] = useState(0);
+  const [grammarScore, setGrammarScore] = useState(0);
+  const [grammarCharState, setGrammarCharState] = useState('normal');
+
+  // --- てがきであなうめ（handwriting）の状態 ---
+  const [handwritingQuizzes, setHandwritingQuizzes] = useState([]);
+  const [handwritingIndex, setHandwritingIndex] = useState(0);
+  const [handwritingScore, setHandwritingScore] = useState(0);
+  const [handwritingCharState, setHandwritingCharState] = useState('normal');
+  const [handwritingResult, setHandwritingResult] = useState(null); // 'correct' | 'incorrect' | null
+  const [recognizedChar, setRecognizedChar] = useState('');
+
+  // 共通状態
   const [progress, setProgress] = useState({
     hiragana: { completed: [], currentIdx: 0 },
     katakana: { completed: [], currentIdx: 0 },
     kanji: { completed: [], currentIdx: 0 }
   });
-  
-  // がんばりポイント (トータルスコア)
   const [score, setScore] = useState(0);
-
-  // なぞり書き成功時の演出オーバーレイ
-  const [showSuccess, setShowSuccess] = useState(false);
 
   // 初期データの読み込み
   useEffect(() => {
@@ -45,35 +82,37 @@ const Japanese = () => {
     loadData();
   }, []);
 
-  // カテゴリに対応する文字リストを取得
-  const getCharList = (cat) => {
-    if (cat === 'hiragana') return hiraganaList;
-    if (cat === 'katakana') return katakanaList;
-    return kanjiList;
+  // --- 各学習モードの初期化・終了処理 ---
+
+  // ことばのクイズ開始
+  const startGrammarQuizzes = () => {
+    const shuffled = [...grammarQuizzesPool].sort(() => Math.random() - 0.5).slice(0, 5);
+    setGrammarQuizzes(shuffled);
+    setGrammarIndex(0);
+    setGrammarScore(0);
+    setGrammarCharState('normal');
+    setStudyMenu('grammar');
   };
 
-  const getCategoryLabel = (cat) => {
-    if (cat === 'hiragana') return 'ひらがな';
-    if (cat === 'katakana') return 'カタカナ';
-    return 'かんじ（1ねんせい）';
+  // てがきであなうめ開始
+  const startHandwritingQuizzes = () => {
+    const shuffled = [...handwritingQuizzesPool].sort(() => Math.random() - 0.5).slice(0, 5);
+    setHandwritingQuizzes(shuffled);
+    setHandwritingIndex(0);
+    setHandwritingScore(0);
+    setHandwritingCharState('normal');
+    setHandwritingResult(null);
+    setRecognizedChar('');
+    setStudyMenu('handwriting');
   };
 
-  // 練習開始
-  const startPractice = (char) => {
-    setActiveChar(char);
-    setViewMode('practice');
-    setShowSuccess(false);
-  };
-
-  // なぞり書き完了時の処理
+  // 1. もじのれんしゅう：なぞり書き完了時の処理
   const handleFinishDraw = async () => {
     playCorrectSound();
     
-    // スコアの保存（1文字クリアで +10 ポイント）
     setScore(s => s + 10);
     await db.saveScore('japanese', { score: 10, date: new Date().toLocaleDateString() });
 
-    // 進捗データの更新
     const catData = progress[category];
     const charList = getCharList(category);
     const charIdx = charList.indexOf(activeChar);
@@ -84,7 +123,6 @@ const Japanese = () => {
     }
 
     let newCurrentIdx = catData.currentIdx;
-    // 現在挑戦中のステージをクリアした場合、次のステージをアンロック
     if (charIdx === catData.currentIdx && catData.currentIdx < charList.length - 1) {
       newCurrentIdx = catData.currentIdx + 1;
     }
@@ -99,27 +137,35 @@ const Japanese = () => {
 
     setProgress(newProgress);
     await db.saveJapaneseProgress(newProgress);
-
-    // 成功アニメーションを表示
     setShowSuccess(true);
   };
 
-  // 次の文字へ進む (ゲームモード用)
+  const getCharList = (cat) => {
+    if (cat === 'hiragana') return hiraganaList;
+    if (cat === 'katakana') return katakanaList;
+    return kanjiList;
+  };
+
+  const getCategoryLabel = (cat) => {
+    if (cat === 'hiragana') return 'ひらがな';
+    if (cat === 'katakana') return 'カタカナ';
+    return 'かんじ（1ねんせい）';
+  };
+
   const handleNextChar = () => {
     const charList = getCharList(category);
     const currentIdx = charList.indexOf(activeChar);
     
     if (currentIdx < charList.length - 1) {
-      startPractice(charList[currentIdx + 1]);
+      setActiveChar(charList[currentIdx + 1]);
+      setShowSuccess(false);
     } else {
-      // カテゴリ全クリア
       playFinishSound();
       alert(`おめでとう！ ${getCategoryLabel(category)} を ぜんぶクリアしたよ！`);
-      setViewMode('menu');
+      setLettersViewMode('menu');
     }
   };
 
-  // 進捗リセット機能 (動作確認ややり直し用)
   const handleResetProgress = async () => {
     if (window.confirm('これまでの すすんだデータを ぜんぶ消して、はじめから やりなおす？')) {
       const resetData = {
@@ -132,118 +178,195 @@ const Japanese = () => {
     }
   };
 
-  // --- UI レンダリングパーツ ---
-
-  // カテゴリ切り替えタブ
-  const renderTabs = () => (
-    <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: '16px', padding: '6px', marginBottom: '20px', gap: '4px' }}>
-      {['hiragana', 'katakana', 'kanji'].map((cat) => {
-        const isActive = category === cat;
-        return (
-          <button
-            key={cat}
-            onClick={() => setCategory(cat)}
-            style={{
-              flex: 1,
-              background: isActive ? 'white' : 'transparent',
-              border: 'none',
-              borderRadius: '12px',
-              padding: '12px 8px',
-              fontWeight: 'bold',
-              fontSize: '1rem',
-              color: isActive ? 'var(--primary-color)' : '#475569',
-              cursor: 'pointer',
-              boxShadow: isActive ? '0 4px 10px rgba(0,0,0,0.05)' : 'none',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            {cat === 'hiragana' ? 'あいうえお' : cat === 'katakana' ? 'アイウエオ' : 'かんじ'}
-          </button>
-        );
-      })}
-    </div>
-  );
-
-  // プレイモード切り替え (トグル)
-  const renderModeSelector = () => (
-    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '25px' }}>
-      <div 
-        style={{ 
-          display: 'inline-flex', 
-          background: 'rgba(255,255,255,0.8)', 
-          borderRadius: '50px', 
-          padding: '4px',
-          boxShadow: '0 4px 15px rgba(0,0,0,0.05)',
-          border: '1px solid rgba(0,0,0,0.05)'
-        }}
-      >
-        <button
-          onClick={() => setPlayMode('game')}
-          style={{
-            background: playMode === 'game' ? 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)' : 'transparent',
-            color: playMode === 'game' ? 'white' : '#64748b',
-            border: 'none',
-            borderRadius: '50px',
-            padding: '10px 20px',
-            fontSize: '0.95rem',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            boxShadow: playMode === 'game' ? '0 4px 10px rgba(255,107,107,0.3)' : 'none'
-          }}
-        >
-          🎮 ステップアップ
-        </button>
-        <button
-          onClick={() => setPlayMode('select')}
-          style={{
-            background: playMode === 'select' ? 'linear-gradient(135deg, #4ECDC4 0%, #2AB7CA 100%)' : 'transparent',
-            color: playMode === 'select' ? 'white' : '#64748b',
-            border: 'none',
-            borderRadius: '50px',
-            padding: '10px 20px',
-            fontSize: '0.95rem',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            boxShadow: playMode === 'select' ? '0 4px 10px rgba(78,205,196,0.3)' : 'none'
-          }}
-        >
-          🔍 えらんでれんしゅう
-        </button>
-      </div>
-    </div>
-  );
-
-  // キャラクターのフキダシ応援メッセージ
-  const getSupportMessage = () => {
-    const catData = progress[category];
-    const total = getCharList(category).length;
-    const completedCount = catData.completed.length;
-
-    if (completedCount === total) {
-      return `すごい！ ${getCategoryLabel(category)} を ぜんぶクリアしたよ！てんさいだね！`;
-    }
-    
-    if (playMode === 'game') {
-      const nextChar = getCharList(category)[catData.currentIdx];
-      return `つぎは 「${nextChar}」 に ちょうせんしてみよう！`;
+  // 2. ことばのクイズ：回答処理
+  const handleGrammarAnswer = (selected) => {
+    const currentQ = grammarQuizzes[grammarIndex];
+    if (selected === currentQ.answer) {
+      playCorrectSound();
+      setGrammarScore(s => s + 10);
+      setGrammarCharState('happy');
     } else {
-      return `れんしゅう したい もじ を クリックしてね！`;
+      playIncorrectSound();
+      setGrammarCharState('sad');
+    }
+
+    setTimeout(async () => {
+      if (grammarIndex < 4) {
+        setGrammarIndex(i => i + 1);
+        setGrammarCharState('normal');
+      } else {
+        // クイズ全問完了
+        playFinishSound();
+        const finalScore = grammarScore + (selected === currentQ.answer ? 10 : 0);
+        setScore(s => s + finalScore);
+        await db.saveScore('japanese', { score: finalScore, date: new Date().toLocaleDateString() });
+        alert(`よくできました！がんばりポイント ${finalScore} をゲットしたよ！`);
+        setStudyMenu('select');
+      }
+    }, 1500);
+  };
+
+  // 3. てがきであなうめ：認識結果処理
+  const handleHandwritingResult = (isCorrect, topCandidate) => {
+    setRecognizedChar(topCandidate);
+    if (isCorrect) {
+      playCorrectSound();
+      setHandwritingResult('correct');
+      setHandwritingScore(s => s + 10);
+      setHandwritingCharState('happy');
+    } else {
+      playIncorrectSound();
+      setHandwritingResult('incorrect');
+      setHandwritingCharState('sad');
     }
   };
 
-  // メニュー画面の描画
-  const renderMenu = () => {
+  const handleNextHandwriting = async () => {
+    setHandwritingResult(null);
+    setRecognizedChar('');
+    setHandwritingCharState('normal');
+
+    if (handwritingIndex < 4) {
+      setHandwritingIndex(i => i + 1);
+    } else {
+      // 全問完了
+      playFinishSound();
+      setScore(s => s + handwritingScore);
+      await db.saveScore('japanese', { score: handwritingScore, date: new Date().toLocaleDateString() });
+      alert(`てがきで あなうめ おわり！がんばりポイント ${handwritingScore} をゲットしたよ！`);
+      setStudyMenu('select');
+    }
+  };
+
+  // --- UIレンダリング画面の定義 ---
+
+  // 学習選択（初期トップメニュー）のレンダリング
+  const renderStudySelectMenu = () => {
+    return (
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '25px' }}>
+          <CharacterSVG type="happy" width={90} height={90} />
+        </div>
+        <p style={{ fontWeight: 'bold', color: '#475569', marginBottom: '30px' }}>
+          どのおべんきょうを する？ えらんでね！
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '480px', margin: '0 auto' }}>
+          {/* メニュー1: もじのれんしゅう */}
+          <div 
+            onClick={() => { setLettersViewMode('menu'); setStudyMenu('letters'); }}
+            className="subject-card"
+            style={{ 
+              flexDirection: 'row', 
+              padding: '20px 24px', 
+              textAlign: 'left', 
+              alignItems: 'center',
+              borderBottom: '4px solid #FF6B6B',
+              background: 'linear-gradient(135deg, #ffffff 0%, #FFF5F5 100%)',
+              justifyContent: 'flex-start',
+              gap: '20px'
+            }}
+          >
+            <div style={{ fontSize: '3rem' }}>🌸</div>
+            <div>
+              <h2 style={{ textAlign: 'left', fontSize: '1.3rem', margin: 0, color: '#E03131' }}>もじの れんしゅう</h2>
+              <p style={{ textAlign: 'left', fontSize: '0.85rem', color: '#787878', marginTop: '4px' }}>
+                ひらがな・カタカナ・かんじ を なぞって きれいに かこう！
+              </p>
+            </div>
+          </div>
+
+          {/* メニュー2: ことばのクイズ */}
+          <div 
+            onClick={startGrammarQuizzes}
+            className="subject-card"
+            style={{ 
+              flexDirection: 'row', 
+              padding: '20px 24px', 
+              textAlign: 'left', 
+              alignItems: 'center',
+              borderBottom: '4px solid #4ECDC4',
+              background: 'linear-gradient(135deg, #ffffff 0%, #F0FDFA 100%)',
+              justifyContent: 'flex-start',
+              gap: '20px'
+            }}
+          >
+            <div style={{ fontSize: '3rem' }}>📖</div>
+            <div>
+              <h2 style={{ textAlign: 'left', fontSize: '1.3rem', margin: 0, color: '#0F766E' }}>ことばの クイズ</h2>
+              <p style={{ textAlign: 'left', fontSize: '0.85rem', color: '#787878', marginTop: '4px' }}>
+                「は」「を」「へ」 など、ただしい つなぎことば を えらぼう！
+              </p>
+            </div>
+          </div>
+
+          {/* メニュー3: てがきであなうめ */}
+          <div 
+            onClick={startHandwritingQuizzes}
+            className="subject-card"
+            style={{ 
+              flexDirection: 'row', 
+              padding: '20px 24px', 
+              textAlign: 'left', 
+              alignItems: 'center',
+              borderBottom: '4px solid #FFE66D',
+              background: 'linear-gradient(135deg, #ffffff 0%, #FFFDF0 100%)',
+              justifyContent: 'flex-start',
+              gap: '20px'
+            }}
+          >
+            <div style={{ fontSize: '3rem' }}>✏️</div>
+            <div>
+              <h2 style={{ textAlign: 'left', fontSize: '1.3rem', margin: 0, color: '#B25E00' }}>てがきで あなうめ</h2>
+              <p style={{ textAlign: 'left', fontSize: '0.85rem', color: '#787878', marginTop: '4px' }}>
+                あいているところに、てがきで もじを かきこもう！
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // 1. もじのれんしゅうモードの画面
+  const renderLettersMenu = () => {
     const charList = getCharList(category);
     const catData = progress[category];
 
     return (
       <div>
-        {renderTabs()}
+        {/* カテゴリタブ */}
+        <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: '16px', padding: '6px', marginBottom: '20px', gap: '4px' }}>
+          {['hiragana', 'katakana', 'kanji'].map((cat) => {
+            const isActive = category === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setCategory(cat)}
+                style={{
+                  flex: 1,
+                  background: isActive ? 'white' : 'transparent',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '12px 8px',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  color: isActive ? 'var(--primary-color)' : '#475569',
+                  cursor: 'pointer',
+                  boxShadow: isActive ? '0 4px 10px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {cat === 'hiragana' ? 'あいうえお' : cat === 'katakana' ? 'アイウエオ' : 'かんじ'}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* プレイモード切替 */}
         {renderModeSelector()}
 
-        {/* キャラクターと応援メッセージ */}
+        {/* キャラクターふきだし */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px', margin: '20px 0', padding: '15px', background: 'rgba(255,255,255,0.4)', borderRadius: '20px' }}>
           <CharacterSVG type="normal" width={70} height={70} />
           <div style={{
@@ -292,7 +415,7 @@ const Japanese = () => {
           </div>
         </div>
 
-        {/* 文字ステージ一覧 */}
+        {/* グリッド表示 */}
         <div 
           style={{ 
             display: 'grid', 
@@ -311,7 +434,6 @@ const Japanese = () => {
             const isCurrent = index === catData.currentIdx;
             const isLocked = playMode === 'game' && index > catData.currentIdx;
 
-            // ボタンのスタイル設定
             let btnBg = 'white';
             let btnBorder = '2px solid #e2e8f0';
             let btnColor = '#475569';
@@ -359,45 +481,17 @@ const Japanese = () => {
                   outline: 'none'
                 }}
               >
-                {/* 鍵マーク */}
-                {isLocked ? (
-                  <span style={{ fontSize: '0.9rem' }}>🔒</span>
-                ) : (
-                  char
-                )}
-
-                {/* クリア済みの星 */}
+                {isLocked ? '🔒' : char}
                 {isCompleted && (
-                  <span 
-                    style={{ 
-                      position: 'absolute', 
-                      bottom: '2px', 
-                      right: '2px', 
-                      fontSize: '0.65rem',
-                      color: '#FFB800'
-                    }}
-                  >
-                    ★
-                  </span>
+                  <span style={{ position: 'absolute', bottom: '2px', right: '2px', fontSize: '0.65rem', color: '#FFB800' }}>★</span>
                 )}
               </button>
             );
           })}
         </div>
 
-        {/* データリセットボタン */}
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: '25px' }}>
-          <button 
-            onClick={handleResetProgress}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#94a3b8',
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              textDecoration: 'underline'
-            }}
-          >
+          <button onClick={handleResetProgress} style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '0.85rem', cursor: 'pointer', textDecoration: 'underline' }}>
             データを リセットする
           </button>
         </div>
@@ -405,22 +499,71 @@ const Japanese = () => {
     );
   };
 
-  // 練習画面の描画
-  const renderPractice = () => {
+  const renderModeSelector = () => (
+    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '25px' }}>
+      <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.8)', borderRadius: '50px', padding: '4px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.05)' }}>
+        <button
+          onClick={() => setPlayMode('game')}
+          style={{
+            background: playMode === 'game' ? 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)' : 'transparent',
+            color: playMode === 'game' ? 'white' : '#64748b',
+            border: 'none',
+            borderRadius: '50px',
+            padding: '10px 20px',
+            fontSize: '0.95rem',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            boxShadow: playMode === 'game' ? '0 4px 10px rgba(255,107,107,0.3)' : 'none'
+          }}
+        >
+          🎮 ステップアップ
+        </button>
+        <button
+          onClick={() => setPlayMode('select')}
+          style={{
+            background: playMode === 'select' ? 'linear-gradient(135deg, #4ECDC4 0%, #2AB7CA 100%)' : 'transparent',
+            color: playMode === 'select' ? 'white' : '#64748b',
+            border: 'none',
+            borderRadius: '50px',
+            padding: '10px 20px',
+            fontSize: '0.95rem',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            boxShadow: playMode === 'select' ? '0 4px 10px rgba(78,205,196,0.3)' : 'none'
+          }}
+        >
+          🔍 えらんでれんしゅう
+        </button>
+      </div>
+    </div>
+  );
+
+  const getSupportMessage = () => {
+    const catData = progress[category];
+    const total = getCharList(category).length;
+    const completedCount = catData.completed.length;
+    if (completedCount === total) return `すごい！ ぜんぶクリアしたよ！`;
+    if (playMode === 'game') {
+      const nextChar = getCharList(category)[catData.currentIdx];
+      return `つぎは 「${nextChar}」 に ちょうせんしてみよう！`;
+    }
+    return `れんしゅう したい もじ を クリックしてね！`;
+  };
+
+  const startPractice = (char) => {
+    setActiveChar(char);
+    setLettersViewMode('practice');
+    setShowSuccess(false);
+  };
+
+  // 1-2. もじのれんしゅう（練習画面）
+  const renderLettersPractice = () => {
     return (
       <div style={{ position: 'relative' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <button 
-            className="btn" 
-            onClick={() => setViewMode('menu')}
-            style={{ 
-              background: '#f8fafc', 
-              color: '#475569', 
-              border: '1px solid #cbd5e1',
-              padding: '10px 20px',
-              fontSize: '1rem'
-            }}
-          >
+          <button className="btn" onClick={() => setLettersViewMode('menu')} style={{ background: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1', padding: '10px 20px', fontSize: '1rem' }}>
             ← いちらんへ
           </button>
           <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--blue-color)' }}>
@@ -449,7 +592,6 @@ const Japanese = () => {
               boxShadow: '0 8px 16px rgba(0,0,0,0.03)'
             }}
           >
-            {/* 音・訓読み */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: '25px', borderBottom: '1px dashed #e2e8f0', paddingBottom: '8px' }}>
               {kanjiDetails[activeChar].kunyomi && (
                 <div>
@@ -463,7 +605,6 @@ const Japanese = () => {
               )}
             </div>
             
-            {/* 例文 */}
             {kanjiDetails[activeChar].examples && kanjiDetails[activeChar].examples.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#64748b', alignSelf: 'flex-start' }}>✏️ つかいかたの れい:</span>
@@ -495,112 +636,233 @@ const Japanese = () => {
           onFinish={handleFinishDraw} 
         />
 
-        {/* 成功時のオーバーレイ演出 */}
         {showSuccess && (
-          <div 
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              background: 'rgba(255,255,255,0.92)',
-              borderRadius: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '20px',
-              zIndex: 100,
-              animation: 'fadeIn 0.3s ease'
-            }}
-          >
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(255,255,255,0.92)', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '20px', zIndex: 100, animation: 'fadeIn 0.3s ease' }}>
             {/* 花丸 */}
-            <div 
-              style={{
-                width: '150px',
-                height: '150px',
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                animation: 'success-pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-              }}
-            >
-              {/* 高精度なはなまるSVG */}
+            <div style={{ width: '150px', height: '150px', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'success-pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
               <svg viewBox="0 0 120 120" width="100%" height="100%">
-                <path 
-                  d="M 60,8 C 53,8 50,20 45,22 C 37,25 31,14 24,19 C 18,24 25,34 22,41 C 20,49 8,53 8,60 C 8,67 20,71 22,79 C 25,86 18,96 24,101 C 31,106 37,95 45,98 C 50,100 53,112 60,112 C 67,112 70,100 75,98 C 83,95 89,106 96,101 C 102,96 95,86 98,79 C 100,71 112,67 112,60 C 112,53 100,49 98,41 C 95,34 102,24 96,19 C 89,14 83,25 75,22 C 70,20 67,8 60,8 Z" 
-                  fill="none" 
-                  stroke="#FF3366" 
-                  strokeWidth="5.5" 
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+                <path d="M 60,8 C 53,8 50,20 45,22 C 37,25 31,14 24,19 C 18,24 25,34 22,41 C 20,49 8,53 8,60 C 8,67 20,71 22,79 C 25,86 18,96 24,101 C 31,106 37,95 45,98 C 50,100 53,112 60,112 C 67,112 70,100 75,98 C 83,95 89,106 96,101 C 102,96 95,86 98,79 C 100,71 112,67 112,60 C 112,53 100,49 98,41 C 95,34 102,24 96,19 C 89,14 83,25 75,22 C 70,20 67,8 60,8 Z" fill="none" stroke="#FF3366" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
                 <circle cx="60" cy="60" r="32" fill="none" stroke="#FF3366" strokeWidth="4.5" />
               </svg>
-              {/* 文字の絶対配置（中央・白フチ付き） */}
-              <div 
-                style={{
-                  position: 'absolute',
-                  fontSize: '0.8rem',
-                  fontWeight: '900',
-                  color: '#FF3366',
-                  textAlign: 'center',
-                  width: '120px',
-                  lineHeight: '1.35',
-                  fontFamily: "'Kosugi Maru', sans-serif",
-                  textShadow: '2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 0 2px 0 #fff, 2px 0 0 #fff, 0 -2px 0 #fff, -2px 0 0 #fff'
-                }}
-              >
-                たいへん<br />
-                <span style={{ whiteSpace: 'nowrap' }}>よくできました</span>
+              <div style={{ position: 'absolute', fontSize: '0.8rem', fontWeight: '900', color: '#FF3366', textAlign: 'center', width: '120px', lineHeight: '1.35', fontFamily: "'Kosugi Maru', sans-serif", textShadow: '2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 0 2px 0 #fff, 2px 0 0 #fff, 0 -2px 0 #fff, -2px 0 0 #fff' }}>
+                たいへん<br /><span style={{ whiteSpace: 'nowrap' }}>よくできました</span>
               </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               <CharacterSVG type="happy" width={90} height={90} />
             </div>
-
             <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#FF3366', textAlign: 'center' }}>
               きれいに かけたね！<br />
               <span style={{ fontSize: '1.1rem', color: '#FF8E53' }}>+10 がんばりポイント！</span>
             </div>
-
             <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
-              <button 
-                className="btn" 
-                onClick={() => setViewMode('menu')}
-                style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}
-              >
+              <button className="btn" onClick={() => setLettersViewMode('menu')} style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>
                 いちらんに もどる
               </button>
-
               {playMode === 'game' ? (
-                <button 
-                  className="btn btn-primary"
-                  onClick={handleNextChar}
-                  style={{
-                    background: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)',
-                    border: 'none',
-                    boxShadow: '0 4px 15px rgba(255,107,107,0.3)'
-                  }}
-                >
+                <button className="btn btn-primary" onClick={handleNextChar} style={{ background: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)', border: 'none', boxShadow: '0 4px 15px rgba(255,107,107,0.3)' }}>
                   つぎのもじへ →
                 </button>
               ) : (
-                <button 
-                  className="btn btn-primary"
-                  onClick={() => setShowSuccess(false)}
-                  style={{
-                    background: 'linear-gradient(135deg, #4ECDC4 0%, #2AB7CA 100%)',
-                    border: 'none',
-                    boxShadow: '0 4px 15px rgba(78,205,196,0.3)'
-                  }}
-                >
+                <button className="btn btn-primary" onClick={() => setShowSuccess(false)} style={{ background: 'linear-gradient(135deg, #4ECDC4 0%, #2AB7CA 100%)', border: 'none', boxShadow: '0 4px 15px rgba(78,205,196,0.3)' }}>
                   もういちど かく
                 </button>
               )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // 2. ことばのクイズ（接続詞クイズ）の画面
+  const renderGrammarQuizzes = () => {
+    if (grammarQuizzes.length === 0) return null;
+    const currentQ = grammarQuizzes[grammarIndex];
+
+    return (
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <button className="btn" onClick={() => setStudyMenu('select')} style={{ background: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1', padding: '10px 20px', fontSize: '1rem' }}>
+            ← メニューへ
+          </button>
+          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--blue-color)' }}>ことばの クイズ</div>
+          <div style={{ fontSize: '1rem', color: '#64748b', fontWeight: 'bold' }}>
+            {grammarIndex + 1} / 5 もんめ
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '20px 0' }}>
+          <CharacterSVG type={grammarCharState} width={90} height={90} />
+        </div>
+
+        <div 
+          style={{ 
+            background: 'white', 
+            borderRadius: '24px', 
+            padding: '30px 20px', 
+            textAlign: 'center', 
+            fontSize: '1.6rem', 
+            fontWeight: 'bold',
+            margin: '20px 0',
+            boxShadow: '0 8px 16px rgba(0,0,0,0.03)',
+            border: '2px solid #e2e8f0',
+            fontFamily: "'Kosugi Maru', sans-serif"
+          }}
+        >
+          {currentQ.sentence}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginTop: '30px' }}>
+          {currentQ.options.map((opt, i) => (
+            <button 
+              key={i} 
+              className="btn btn-primary" 
+              style={{ 
+                width: '80%', 
+                background: 'linear-gradient(135deg, #4ECDC4 0%, #2AB7CA 100%)', 
+                border: 'none',
+                boxShadow: '0 4px 15px rgba(78,205,196,0.2)',
+                fontSize: '1.5rem',
+                padding: '12px 0'
+              }}
+              onClick={() => handleGrammarAnswer(opt)}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // 3. てがきであなうめ（手書き文字認識）の画面
+  const renderHandwritingQuizzes = () => {
+    if (handwritingQuizzes.length === 0) return null;
+    const currentQ = handwritingQuizzes[handwritingIndex];
+
+    return (
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <button className="btn" onClick={() => setStudyMenu('select')} style={{ background: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1', padding: '10px 20px', fontSize: '1rem' }}>
+            ← メニューへ
+          </button>
+          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--blue-color)' }}>てがきで あなうめ</div>
+          <div style={{ fontSize: '1rem', color: '#64748b', fontWeight: 'bold' }}>
+            {handwritingIndex + 1} / 5 もんめ
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '15px 0' }}>
+          <CharacterSVG type={handwritingCharState} width={80} height={80} />
+        </div>
+
+        {/* 穴埋め問題文章 */}
+        <div 
+          style={{ 
+            background: 'white', 
+            borderRadius: '24px', 
+            padding: '24px 20px', 
+            textAlign: 'center', 
+            fontSize: '1.5rem', 
+            fontWeight: 'bold',
+            margin: '15px 0',
+            boxShadow: '0 8px 16px rgba(0,0,0,0.03)',
+            border: '2px solid #e2e8f0',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '8px',
+            fontFamily: "'Kosugi Maru', sans-serif"
+          }}
+        >
+          <span>{currentQ.textBefore}</span>
+          <span 
+            style={{ 
+              display: 'inline-block', 
+              width: '45px', 
+              height: '45px', 
+              lineHeight: '38px',
+              border: '3px dashed #FF6B6B', 
+              borderRadius: '8px', 
+              background: '#FFF5F5',
+              color: '#FF6B6B',
+              fontSize: '1.6rem'
+            }}
+          >
+            {handwritingResult === 'correct' ? currentQ.answer : (recognizedChar || ' ')}
+          </span>
+          <span>{currentQ.textAfter}</span>
+        </div>
+
+        {/* 手書き認識キャンバス */}
+        {handwritingResult === null ? (
+          <HandwritingRecognizer 
+            expectedAnswer={currentQ.answer}
+            hintText={currentQ.hint}
+            onResult={handleHandwritingResult}
+          />
+        ) : (
+          /* 回答結果のアニメーション・演出画面 */
+          <div 
+            style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              gap: '20px', 
+              padding: '20px',
+              background: 'white',
+              borderRadius: '24px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.05)',
+              border: '2px solid #e2e8f0',
+              animation: 'fadeIn 0.3s ease'
+            }}
+          >
+            {handwritingResult === 'correct' ? (
+              <>
+                <div style={{ width: '120px', height: '120px', position: 'relative', display: 'flex', alignItems: 'center', justifyItems: 'center' }}>
+                  <svg viewBox="0 0 120 120" width="100%" height="100%">
+                    <path d="M 60,8 C 53,8 50,20 45,22 C 37,25 31,14 24,19 C 18,24 25,34 22,41 C 20,49 8,53 8,60 C 8,67 20,71 22,79 C 25,86 18,96 24,101 C 31,106 37,95 45,98 C 50,100 53,112 60,112 C 67,112 70,100 75,98 C 83,95 89,106 96,101 C 102,96 95,86 98,79 C 100,71 112,67 112,60 C 112,53 100,49 98,41 C 95,34 102,24 96,19 C 89,14 83,25 75,22 C 70,20 67,8 60,8 Z" fill="none" stroke="#FF3366" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="60" cy="60" r="32" fill="none" stroke="#FF3366" strokeWidth="4.5" />
+                  </svg>
+                </div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 'bold', color: '#FF3366', textAlign: 'center' }}>
+                  せいかい！すごい！🌟<br />
+                  <span style={{ fontSize: '1.1rem', color: '#64748b' }}>「{recognizedChar}」って よみとれたよ！</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: '4rem' }}>❌</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#64748b', textAlign: 'center' }}>
+                  おしかったね！💦<br />
+                  <span style={{ fontSize: '1.1rem', color: '#FF6B6B' }}>「{recognizedChar}」って かいてあるみたい。</span>
+                </div>
+              </>
+            )}
+
+            <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
+              {handwritingResult === 'incorrect' ? (
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => setHandwritingResult(null)}
+                  style={{ background: '#FF6B6B', border: 'none', color: 'white' }}
+                >
+                  もういちど かく
+                </button>
+              ) : null}
+              <button 
+                className="btn btn-primary"
+                onClick={handleNextHandwriting}
+                style={{
+                  background: 'linear-gradient(135deg, #4ECDC4 0%, #2AB7CA 100%)',
+                  border: 'none',
+                  boxShadow: '0 4px 15px rgba(78,205,196,0.3)'
+                }}
+              >
+                {handwritingIndex < 4 ? 'つぎのもんだいへ →' : 'おわり！ 🎌'}
+              </button>
             </div>
           </div>
         )}
@@ -615,8 +877,12 @@ const Japanese = () => {
         <button 
           className="btn" 
           onClick={() => {
-            if (viewMode === 'practice') {
-              setViewMode('menu');
+            if (studyMenu !== 'select') {
+              if (studyMenu === 'letters' && lettersViewMode === 'practice') {
+                setLettersViewMode('menu');
+              } else {
+                setStudyMenu('select');
+              }
             } else {
               navigate('/');
             }
@@ -641,7 +907,10 @@ const Japanese = () => {
         </div>
       </div>
 
-      {viewMode === 'menu' ? renderMenu() : renderPractice()}
+      {studyMenu === 'select' && renderStudySelectMenu()}
+      {studyMenu === 'letters' && (lettersViewMode === 'menu' ? renderLettersMenu() : renderLettersPractice())}
+      {studyMenu === 'grammar' && renderGrammarQuizzes()}
+      {studyMenu === 'handwriting' && renderHandwritingQuizzes()}
 
       {/* スタイル定義 */}
       <style>{`
