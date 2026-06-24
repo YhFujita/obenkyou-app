@@ -160,7 +160,6 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
         }
       } catch (e) {
         console.warn(`KanjiVG fetch failed for "${targetText}":`, e);
-        alert(`なぞり書きロードエラー (${targetText}): ${e.message}\n${e.stack || ''}`);
         if (active) {
           // フォールバックモード（従来のフリーハンドお絵かき）へ移行
           setUseFallbackText(true);
