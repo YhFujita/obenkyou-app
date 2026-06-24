@@ -543,17 +543,18 @@ const Japanese = () => {
               <div 
                 style={{
                   position: 'absolute',
-                  fontSize: '0.85rem',
+                  fontSize: '0.8rem',
                   fontWeight: '900',
                   color: '#FF3366',
                   textAlign: 'center',
-                  width: '90px',
+                  width: '120px',
                   lineHeight: '1.35',
                   fontFamily: "'Kosugi Maru', sans-serif",
                   textShadow: '2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 0 2px 0 #fff, 2px 0 0 #fff, 0 -2px 0 #fff, -2px 0 0 #fff'
                 }}
               >
-                たいへん<br />よくできました
+                たいへん<br />
+                <span style={{ whiteSpace: 'nowrap' }}>よくできました</span>
               </div>
             </div>
 
