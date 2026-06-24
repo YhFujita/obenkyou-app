@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { selectQuizzes } from '../quizUtils';
 import StrokeOrderCanvas from '../components/StrokeOrderCanvas';
 import HandwritingRecognizer from '../components/HandwritingRecognizer';
 import { CharacterSVG } from '../CharacterSVG';
@@ -110,8 +111,8 @@ const Japanese = () => {
 
   // ことばのクイズ開始
   const startGrammarQuizzes = () => {
-    const shuffled = [...grammarQuizzesPool].sort(() => Math.random() - 0.5).slice(0, 5);
-    setGrammarQuizzes(shuffled);
+    const selected = selectQuizzes(grammarQuizzesPool, 5, 'japanese_grammar_history', 'sentence', true);
+    setGrammarQuizzes(selected);
     setGrammarIndex(0);
     setGrammarScore(0);
     setGrammarCharState('normal');
@@ -121,8 +122,8 @@ const Japanese = () => {
 
   // てがきであなうめ開始
   const startHandwritingQuizzes = () => {
-    const shuffled = [...handwritingQuizzesPool].sort(() => Math.random() - 0.5).slice(0, 5);
-    setHandwritingQuizzes(shuffled);
+    const selected = selectQuizzes(handwritingQuizzesPool, 5, 'japanese_handwriting_history', 'hint', true);
+    setHandwritingQuizzes(selected);
     setHandwritingIndex(0);
     setHandwritingScore(0);
     setHandwritingCharState('normal');

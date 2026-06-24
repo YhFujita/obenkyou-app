@@ -11,19 +11,35 @@ const MathPage = () => {
   const maxQuestions = 5;
   const [question, setQuestion] = useState({ num1: 0, num2: 0, op: '+', answer: 0, options: [] });
   const [characterState, setCharacterState] = useState('normal');
+  const [usedQuestions, setUsedQuestions] = useState([]);
 
-  const generateQuestion = () => {
-    const isAddition = Math.random() > 0.5;
-    let num1, num2, answer;
+  const generateQuestion = (currentUsed = usedQuestions) => {
+    let num1, num2, op, answer;
+    let attempts = 0;
 
-    if (isAddition) {
-      num1 = Math.floor(Math.random() * 10) + 1; // 1-10
-      num2 = Math.floor(Math.random() * 10) + 1;
-      answer = num1 + num2;
-    } else {
-      num1 = Math.floor(Math.random() * 10) + 10; // 10-19
-      num2 = Math.floor(Math.random() * 9) + 1; // 1-9
-      answer = num1 - num2;
+    while (attempts < 100) {
+      const isAddition = Math.random() > 0.5;
+      if (isAddition) {
+        num1 = Math.floor(Math.random() * 10) + 1; // 1-10
+        num2 = Math.floor(Math.random() * 10) + 1;
+        answer = num1 + num2;
+        op = '+';
+      } else {
+        num1 = Math.floor(Math.random() * 10) + 10; // 10-19
+        num2 = Math.floor(Math.random() * 9) + 1; // 1-9
+        answer = num1 - num2;
+        op = '-';
+      }
+
+      // 重複チェック
+      const isDuplicate = currentUsed.some(
+        q => q.num1 === num1 && q.num2 === num2 && q.op === op
+      );
+
+      if (!isDuplicate) {
+        break;
+      }
+      attempts++;
     }
 
     // ダミーの選択肢を生成
@@ -35,15 +51,17 @@ const MathPage = () => {
       }
     }
     // シャッフル
-    options = Array.from(options).sort(() => Math.random() - 0.5);
+    const shuffledOptions = Array.from(options).sort(() => Math.random() - 0.5);
 
-    setQuestion({ num1, num2, op: isAddition ? '+' : '-', answer, options });
+    const newQuestion = { num1, num2, op, answer, options: shuffledOptions };
+    setQuestion(newQuestion);
+    setUsedQuestions(prev => [...prev, newQuestion]);
     setCharacterState('normal');
   };
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      generateQuestion();
+      generateQuestion([]);
     }, 0);
     return () => clearTimeout(timer);
   }, []);

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { selectQuizzes } from '../quizUtils';
 import { CharacterSVG } from '../CharacterSVG';
 import { playCorrectSound, playIncorrectSound, playFinishSound } from '../audio';
 import { db } from '../db';
@@ -30,8 +31,8 @@ const LifeGeneralQuiz = () => {
   const [characterState, setCharacterState] = useState('normal');
 
   useEffect(() => {
-    const shuffled = [...allQuizzes].sort(() => Math.random() - 0.5).slice(0, 5);
-    setQuizzes(shuffled);
+    const selected = selectQuizzes(allQuizzes, 5, 'life_general_quiz_history', 'q');
+    setQuizzes(selected);
   }, []);
 
   const handleAnswer = async (selected) => {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { selectQuizzes } from '../quizUtils';
 import { CharacterSVG } from '../CharacterSVG';
 import { playCorrectSound, playIncorrectSound, playFinishSound } from '../audio';
 import { db } from '../db';
@@ -33,9 +34,9 @@ const NatureQuiz = () => {
   const [showImageError, setShowImageError] = useState(false);
 
   useEffect(() => {
-    // ランダムに5問を選ぶ
-    const shuffled = [...allQuizzes].sort(() => Math.random() - 0.5).slice(0, 5);
-    setQuizzes(shuffled);
+    // ランダムに5問を選ぶ（履歴管理対応）
+    const selected = selectQuizzes(allQuizzes, 5, 'nature_quiz_history', 'q');
+    setQuizzes(selected);
   }, []);
 
   const handleAnswer = async (selected) => {

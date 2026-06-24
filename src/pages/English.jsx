@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { selectQuizzes } from '../quizUtils';
 import { CharacterSVG } from '../CharacterSVG';
 import { playFinishSound } from '../audio';
 import { db } from '../db';
@@ -34,8 +35,8 @@ const allFlashcards = [
 
 const English = () => {
   const navigate = useNavigate();
-  // 初期化時にランダムに選ぶように変更
-  const [flashcards] = useState(() => [...allFlashcards].sort(() => Math.random() - 0.5).slice(0, 10));
+  // 初期化時にランダムに選ぶように変更（履歴管理対応）
+  const [flashcards] = useState(() => selectQuizzes(allFlashcards, 10, 'english_cards_history', 'word'));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
 
