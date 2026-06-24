@@ -40,6 +40,16 @@ const Life = () => {
           <h3>しぜんかんさつ</h3>
           <p style={{ fontSize: '0.9rem', color: '#666', margin: 0 }}>むし や おはな の しゃしんクイズ</p>
         </div>
+
+        <div 
+          className="subject-card"
+          style={{ width: '80%', borderBottom: '4px solid #FF6B6B', cursor: 'pointer' }}
+          onClick={() => navigate('/life-habits')}
+        >
+          <div className="subject-icon">⭐</div>
+          <h3>じぶんでできるよ</h3>
+          <p style={{ fontSize: '0.9rem', color: '#666', margin: 0 }}>おてつだい・せいかつリズム・目標シール</p>
+        </div>
       </div>
     </div>
   );

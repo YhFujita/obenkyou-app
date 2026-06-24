@@ -6,6 +6,7 @@ import Life from './pages/Life';
 import English from './pages/English';
 import NatureQuiz from './pages/NatureQuiz';
 import LifeGeneralQuiz from './pages/LifeGeneralQuiz';
+import LifeHabits from './pages/LifeHabits';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="/life-quiz" element={<LifeGeneralQuiz />} />
           <Route path="/english" element={<English />} />
           <Route path="/nature-quiz" element={<NatureQuiz />} />
+          <Route path="/life-habits" element={<LifeHabits />} />
         </Routes>
       </div>
     </Router>
