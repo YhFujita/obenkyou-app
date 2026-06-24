@@ -47,6 +47,12 @@ const Japanese = () => {
   const [activeChar, setActiveChar] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
 
+  // --- じぶんでれんしゅう (AI判定) 用の状態 ---
+  const [practiceMode, setPracticeMode] = useState('trace'); // 'trace' | 'free'
+  const [showFreeGuideText, setShowFreeGuideText] = useState(true);
+  const [freeHandwritingResult, setFreeHandwritingResult] = useState(null); // 'correct' | 'incorrect' | null
+  const [freeRecognizedChar, setFreeRecognizedChar] = useState('');
+
   // --- ことばのクイズ（grammar）の状態 ---
   const [grammarQuizzes, setGrammarQuizzes] = useState([]);
   const [grammarIndex, setGrammarIndex] = useState(0);
@@ -142,6 +148,18 @@ const Japanese = () => {
     setShowSuccess(true);
   };
 
+  // フリーハンド手書き（AI判定）練習の判定処理
+  const handleFreeHandwritingResult = (isCorrect, recognizedChar) => {
+    setFreeRecognizedChar(recognizedChar);
+    if (isCorrect) {
+      setFreeHandwritingResult('correct');
+      handleFinishDraw(); // なぞり書き同様の花丸・ポイント獲得演出を呼ぶ
+    } else {
+      playIncorrectSound();
+      setFreeHandwritingResult('incorrect');
+    }
+  };
+
   const getCharList = (cat) => {
     if (cat === 'hiragana') return hiraganaList;
     if (cat === 'katakana') return katakanaList;
@@ -161,6 +179,9 @@ const Japanese = () => {
     if (currentIdx < charList.length - 1) {
       setActiveChar(charList[currentIdx + 1]);
       setShowSuccess(false);
+      // フリーハンド用のステートを初期化
+      setFreeHandwritingResult(null);
+      setFreeRecognizedChar('');
     } else {
       playFinishSound();
       alert(`おめでとう！ ${getCategoryLabel(category)} を ぜんぶクリアしたよ！`);
@@ -561,6 +582,10 @@ const Japanese = () => {
     setActiveChar(char);
     setLettersViewMode('practice');
     setShowSuccess(false);
+    // モードとフリーハンド状態をリセット
+    setPracticeMode('trace');
+    setFreeHandwritingResult(null);
+    setFreeRecognizedChar('');
   };
 
   // 1-2. もじのれんしゅう（練習画面）
@@ -636,10 +661,116 @@ const Japanese = () => {
           </div>
         )}
 
-        <StrokeOrderCanvas 
-          targetText={activeChar} 
-          onFinish={handleFinishDraw} 
-        />
+        {/* なぞりと手書き(AI判定)の切り替えトグル */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '15px' }}>
+          <button 
+            onClick={() => { setPracticeMode('trace'); setFreeHandwritingResult(null); }}
+            style={{
+              background: practiceMode === 'trace' ? 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)' : '#e2e8f0',
+              color: practiceMode === 'trace' ? 'white' : '#475569',
+              border: 'none',
+              borderRadius: '50px',
+              padding: '10px 20px',
+              fontSize: '0.95rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              boxShadow: practiceMode === 'trace' ? '0 4px 10px rgba(255,107,107,0.3)' : 'none',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            🎮 なぞってれんしゅう
+          </button>
+          <button 
+            onClick={() => { setPracticeMode('free'); setFreeHandwritingResult(null); }}
+            style={{
+              background: practiceMode === 'free' ? 'linear-gradient(135deg, #4ECDC4 0%, #2AB7CA 100%)' : '#e2e8f0',
+              color: practiceMode === 'free' ? 'white' : '#475569',
+              border: 'none',
+              borderRadius: '50px',
+              padding: '10px 20px',
+              fontSize: '0.95rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              boxShadow: practiceMode === 'free' ? '0 4px 10px rgba(78,205,196,0.3)' : 'none',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            ✏️ じぶんでれんしゅう (AI判定)
+          </button>
+        </div>
+
+        {/* じぶんでれんしゅう(AI判定)時のガイドテキスト表示切り替え */}
+        {practiceMode === 'free' && (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginBottom: '15px', fontSize: '0.95rem', fontWeight: 'bold', color: '#475569' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
+              <input 
+                type="checkbox" 
+                checked={showFreeGuideText}
+                onChange={(e) => setShowFreeGuideText(e.target.checked)}
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+              背景にお手本の文字をだす
+            </label>
+          </div>
+        )}
+
+        {/* キャンバス切り替え */}
+        {practiceMode === 'trace' ? (
+          <StrokeOrderCanvas 
+            targetText={activeChar} 
+            onFinish={handleFinishDraw} 
+          />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', marginTop: '10px' }}>
+            {freeHandwritingResult !== 'incorrect' ? (
+              <HandwritingRecognizer 
+                expectedAnswer={activeChar}
+                backgroundText={activeChar}
+                showBackgroundText={showFreeGuideText}
+                onResult={handleFreeHandwritingResult}
+              />
+            ) : (
+              <div 
+                style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center', 
+                  gap: '20px', 
+                  padding: '24px 20px',
+                  background: 'white',
+                  borderRadius: '24px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.05)',
+                  border: '2px solid #e2e8f0',
+                  width: '280px',
+                  animation: 'fadeIn 0.3s ease'
+                }}
+              >
+                <div style={{ fontSize: '4.5rem' }}>❌</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#64748b', textAlign: 'center', lineHeight: '1.4' }}>
+                  おしかったね！💦<br />
+                  <span style={{ fontSize: '1.05rem', color: '#FF6B6B' }}>「{freeRecognizedChar}」って かいてあるみたい。</span>
+                </div>
+                <button 
+                  className="btn" 
+                  onClick={() => setFreeHandwritingResult(null)}
+                  style={{ 
+                    background: '#FF6B6B', 
+                    border: 'none', 
+                    color: 'white', 
+                    padding: '12px 28px', 
+                    fontSize: '1rem', 
+                    fontWeight: 'bold', 
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 10px rgba(255,107,107,0.3)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  もういちど かく
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {showSuccess && (
           <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(255,255,255,0.92)', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '20px', zIndex: 100, animation: 'fadeIn 0.3s ease' }}>

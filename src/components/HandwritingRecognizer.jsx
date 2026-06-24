@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 
-const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
+const HandwritingRecognizer = ({ expectedAnswer, onResult, backgroundText = '', showBackgroundText = false }) => {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const inkRef = useRef([]); // [ [ [x], [y], [t] ], ... ]
@@ -9,6 +9,7 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
   const [loading, setLoading] = useState(false);
   const ctxRef = useRef(null);
 
+  // 初回マウント時の初期設定
   useEffect(() => {
     const canvas = canvasRef.current;
     const dpr = window.devicePixelRatio || 1;
@@ -27,6 +28,40 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
 
     drawBackground(ctx, rect.width, rect.height);
   }, []);
+
+  // 背景の文字や表示設定が変わった時に背景を更新し、描画済みのインクも再描画する
+  useEffect(() => {
+    if (ctxRef.current && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      drawBackground(ctxRef.current, rect.width, rect.height);
+      reDrawInk();
+    }
+  }, [backgroundText, showBackgroundText]);
+
+  // インクデータの再描画
+  const reDrawInk = () => {
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+    
+    ctx.save();
+    ctx.strokeStyle = '#1E3E62';
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    inkRef.current.forEach(stroke => {
+      const xs = stroke[0];
+      const ys = stroke[1];
+      if (xs.length === 0) return;
+      ctx.beginPath();
+      ctx.moveTo(xs[0], ys[0]);
+      for (let i = 1; i < xs.length; i++) {
+        ctx.lineTo(xs[i], ys[i]);
+      }
+      ctx.stroke();
+    });
+    ctx.restore();
+  };
 
   function drawBackground(ctx, width, height) {
     ctx.clearRect(0, 0, width, height);
@@ -47,6 +82,17 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
     ctx.lineTo(width - 10, height / 2);
     ctx.strokeStyle = '#f1f5f9';
     ctx.stroke();
+
+    // 背景にお手本文字をうっすら描画
+    if (showBackgroundText && backgroundText) {
+      ctx.save();
+      ctx.font = `bold ${width * 0.65}px 'Kosugi Maru', sans-serif`;
+      ctx.fillStyle = 'rgba(226, 232, 240, 0.55)'; // 練習を邪魔しない薄いグレー
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(backgroundText, width / 2, height / 2);
+      ctx.restore();
+    }
 
     ctx.strokeStyle = '#1E3E62';
     ctx.lineWidth = 10;
