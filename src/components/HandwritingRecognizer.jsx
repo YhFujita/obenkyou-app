@@ -302,7 +302,7 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, backgroundText = '', 
       }
     } catch (err) {
       console.error(err);
-      alert('文字の読み取りに失敗しました。インターネットに繋がっているか確認してね！');
+      alert(`デバッグエラー: ${err.message}\n${err.stack || ''}`);
     } finally {
       setLoading(false);
     }
