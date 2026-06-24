@@ -3,8 +3,9 @@ import { useRef, useState, useEffect } from 'react';
 const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [ink, setInk] = useState([]);
-  const [currentStroke, setCurrentStroke] = useState([[], [], []]); // [ [x], [y], [t] ]
+  const inkRef = useRef([]); // [ [ [x], [y], [t] ], ... ]
+  const currentStrokeRef = useRef([[], [], []]); // [ [x], [y], [t] ]
+  const [hasInk, setHasInk] = useState(false);
   const [loading, setLoading] = useState(false);
   const ctxRef = useRef(null);
 
@@ -71,7 +72,7 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
     ctxRef.current.beginPath();
     ctxRef.current.moveTo(x, y);
 
-    setCurrentStroke([[x], [y], [t]]);
+    currentStrokeRef.current = [[x], [y], [t]];
     setIsDrawing(true);
   };
 
@@ -84,25 +85,25 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
     ctxRef.current.lineTo(x, y);
     ctxRef.current.stroke();
 
-    // インクデータを構築
-    const nextStroke = [
-      [...currentStroke[0], Math.round(x)],
-      [...currentStroke[1], Math.round(y)],
-      [...currentStroke[2], t]
-    ];
-    setCurrentStroke(nextStroke);
+    // 直接 ref 内の配列にプッシュすることで React の非同期ステート遅延を回避し、
+    // マウス・タッチ移動時の全座標をこぼさず完全に記録します。
+    currentStrokeRef.current[0].push(Math.round(x));
+    currentStrokeRef.current[1].push(Math.round(y));
+    currentStrokeRef.current[2].push(t);
   };
 
   const stopDrawing = () => {
     if (isDrawing) {
       setIsDrawing(false);
-      setInk([...ink, currentStroke]);
+      inkRef.current.push(currentStrokeRef.current);
+      setHasInk(true);
     }
   };
 
   // 文字の判定処理を呼び出す
   const handleCheck = async () => {
-    if (ink.length === 0) {
+    const inkData = inkRef.current;
+    if (inkData.length === 0) {
       alert('四角の中に 文字を 書いてね！');
       return;
     }
@@ -110,9 +111,8 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
     setLoading(true);
     try {
       // タイムスタンプ t を最初の点を基準(0ms)とする相対時間（経過ミリ秒）に変換します。
-      // 絶対時間のままだと、APIがストローク間隔を正しく処理できず認識に失敗する原因になります。
       let firstTime = null;
-      const relativeInk = ink.map(stroke => {
+      const relativeInk = inkData.map(stroke => {
         const xs = stroke[0];
         const ys = stroke[1];
         const ts = stroke[2];
@@ -122,6 +122,8 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
         const newTs = ts.map(t => (firstTime !== null ? t - firstTime : 0));
         return [xs, ys, newTs];
       });
+
+      console.log('Sending handwriting ink data:', relativeInk);
 
       const response = await fetch('https://inputtools.google.com/request?itc=ja-t-i0-handwrit&num=5', {
         method: 'POST',
@@ -151,7 +153,6 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
         console.log('Handwriting recognized candidates:', candidates);
         
         // 候補の先頭3つの中に正解の文字（ひらがな）が含まれているかチェック
-        // 子供のあいまいな書き方を考慮して、上位3つの候補でチェックする
         const cleanCandidates = candidates.map(c => c.trim());
         const isCorrect = cleanCandidates.slice(0, 3).includes(expectedAnswer);
         
@@ -171,8 +172,9 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     drawBackground(ctxRef.current, rect.width, rect.height);
-    setInk([]);
-    setCurrentStroke([[], [], []]);
+    inkRef.current = [];
+    currentStrokeRef.current = [[], [], []];
+    setHasInk(false);
   };
 
   return (
@@ -234,7 +236,7 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, hintText }) => {
         <button
           className="btn btn-primary"
           onClick={handleCheck}
-          disabled={loading || ink.length === 0}
+          disabled={loading || !hasInk}
           style={{
             background: 'linear-gradient(135deg, #4ECDC4 0%, #2AB7CA 100%)',
             border: 'none',
