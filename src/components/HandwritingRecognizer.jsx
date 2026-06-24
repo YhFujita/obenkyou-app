@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
+import strokeDataJson from '../data/strokeData.json';
 
 const HandwritingRecognizer = ({ expectedAnswer, onResult, backgroundText = '', showBackgroundText = false }) => {
   const canvasRef = useRef(null);
@@ -95,14 +96,37 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, backgroundText = '', 
     ctx.strokeStyle = '#f1f5f9';
     ctx.stroke();
 
-    // 背景にお手本文字をうっすら描画
+    // 背景にお手本文字をうっすら描画 (なぞり書きと全く同じSVGパスを使用)
     if (showBackgroundText && backgroundText) {
       ctx.save();
-      ctx.font = `bold ${width * 0.65}px 'Kosugi Maru', sans-serif`;
-      ctx.fillStyle = 'rgba(226, 232, 240, 0.55)'; // 練習を邪魔しない薄いグレー
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(backgroundText, width / 2, height / 2);
+      const charData = strokeDataJson[backgroundText];
+      
+      if (charData && charData.paths && charData.paths.length > 0) {
+        // なぞり書き(KanjiVG)のSVGパスと同じ形状でキャンバスに描画
+        const svgSize = 109; // KanjiVGの基準サイズ
+        const scale = (width * 0.76) / svgSize;
+        const offset = (width - svgSize * scale) / 2;
+        
+        ctx.translate(offset, offset);
+        ctx.scale(scale, scale);
+        
+        ctx.strokeStyle = 'rgba(226, 232, 240, 0.6)'; // なぞり書きと重ねやすい薄いグレー
+        ctx.lineWidth = 6; // 太めのなぞりガイド線
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        charData.paths.forEach(pathStr => {
+          const path = new Path2D(pathStr);
+          ctx.stroke(path);
+        });
+      } else {
+        // 万が一パスデータが無い場合のフォールバック（フォント描画）
+        ctx.font = `bold ${width * 0.65}px 'Kosugi Maru', sans-serif`;
+        ctx.fillStyle = 'rgba(226, 232, 240, 0.55)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(backgroundText, width / 2, height / 2);
+      }
       ctx.restore();
     }
 
