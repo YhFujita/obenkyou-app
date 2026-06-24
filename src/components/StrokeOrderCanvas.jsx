@@ -178,27 +178,35 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
     };
   }, [targetText]);
 
-  // パスの長さを一括測定するエフェクト
+  // パスの長さを一括測定するエフェクト (Safari / iOS 互換性対応)
+  // 一時的にDOMに追加・即時削除する方法だとSafariでgetTotalLength()が0を返すバグがあるため、
+  // 実際に描画されたSVG要素(#stroke-bg-ID)から測定します。
   useEffect(() => {
     if (strokes.length > 0 && svgRef.current) {
-      const tempLengths = strokes.map((d) => {
-        try {
-          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          path.setAttribute('d', d);
-          svgRef.current.appendChild(path);
-          const len = path.getTotalLength();
-          svgRef.current.removeChild(path);
-          return len;
-        } catch (e) {
-          console.error('Error measuring stroke length:', e);
-          return 150; // デフォルト値
-        }
-      });
-      setStrokeLengths(tempLengths);
+      // DOMのマウントとSafariのレイアウト計算を待つための微小ウェイト
+      const timer = setTimeout(() => {
+        if (!svgRef.current) return;
+        const tempLengths = strokes.map((d, index) => {
+          try {
+            const pathEl = svgRef.current.querySelector(`#stroke-bg-${index}`);
+            if (pathEl) {
+              const len = pathEl.getTotalLength();
+              return len > 0 ? len : 180;
+            }
+            return 180;
+          } catch (e) {
+            console.error('Error measuring stroke length from DOM:', e);
+            return 180;
+          }
+        });
+        setStrokeLengths(tempLengths);
+      }, 60);
+
+      return () => clearTimeout(timer);
     } else {
       setStrokeLengths([]);
     }
-  }, [strokes]);
+  }, [strokes, loading, useFallbackText]);
 
   // 新しい画（ガイド）が表示された時に、その始点を計算する
   useEffect(() => {
@@ -530,6 +538,7 @@ const StrokeOrderCanvas = ({ targetText, onFinish }) => {
             {strokes.map((d, index) => (
               <path
                 key={`bg-${index}`}
+                id={`stroke-bg-${index}`}
                 d={d}
                 fill="none"
                 stroke="#F0F3F7"

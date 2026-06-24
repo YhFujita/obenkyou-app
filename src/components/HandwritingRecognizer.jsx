@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import strokeDataJson from '../data/strokeData.json';
+import { db } from '../db';
 
 const HandwritingRecognizer = ({ expectedAnswer, onResult, backgroundText = '', showBackgroundText = false }) => {
   const canvasRef = useRef(null);
@@ -9,6 +10,9 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, backgroundText = '', 
   const [hasInk, setHasInk] = useState(false);
   const [loading, setLoading] = useState(false);
   const ctxRef = useRef(null);
+
+  // 背景に表示するSVGパスの配列
+  const [backgroundPaths, setBackgroundPaths] = useState([]);
 
   // 初回マウント時の初期設定
   useEffect(() => {
@@ -30,10 +34,61 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, backgroundText = '', 
     drawBackground(ctx, rect.width, rect.height);
   }, []);
 
+  // 背景お手本用のSVGパスを非同期でロードする
+  useEffect(() => {
+    let active = true;
+    const loadBackgroundPaths = async () => {
+      if (!showBackgroundText || !backgroundText) {
+        setBackgroundPaths([]);
+        return;
+      }
+
+      // 1. ローカルJSONを確認
+      if (strokeDataJson[backgroundText]) {
+        if (active) setBackgroundPaths(strokeDataJson[backgroundText].paths || []);
+        return;
+      }
+
+      // 2. IndexedDBキャッシュを確認
+      try {
+        const cached = await db.getCachedStroke(backgroundText);
+        if (cached && active) {
+          setBackgroundPaths(cached.paths || []);
+          return;
+        }
+      } catch (err) {
+        console.warn('Failed to read background stroke cache:', err);
+      }
+
+      // 3. オンラインからフェッチ
+      try {
+        const codePoint = backgroundText.codePointAt(0).toString(16).padStart(5, '0');
+        const url = `https://cdn.jsdelivr.net/gh/kanjivg/kanjivg@master/kanji/${codePoint}.svg`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const svgText = await res.text();
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(svgText, 'image/svg+xml');
+          const paths = Array.from(doc.querySelectorAll('path')).map(p => p.getAttribute('d') || '');
+          if (active && paths.length > 0) {
+            setBackgroundPaths(paths);
+            // キャッシュに保存
+            await db.saveCachedStroke(backgroundText, { paths, numbers: [] });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch background stroke:', err);
+      }
+    };
+
+    loadBackgroundPaths();
+    return () => { active = false; };
+  }, [backgroundText, showBackgroundText]);
+
   // 前の文字を追跡して、文字が切り替わったことを検知する
   const lastTextRef = useRef(backgroundText);
 
-  // 背景の文字や表示設定が変わった時に背景を更新し、描画済みのインクも再描画する
+  // 背景の文字や表示設定、パスデータが変わった時に背景を更新し、描画済みのインクも再描画する
   useEffect(() => {
     if (ctxRef.current && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
@@ -49,7 +104,7 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, backgroundText = '', 
       drawBackground(ctxRef.current, rect.width, rect.height);
       reDrawInk();
     }
-  }, [backgroundText, showBackgroundText]);
+  }, [backgroundText, showBackgroundText, backgroundPaths]);
 
   // インクデータの再描画
   const reDrawInk = () => {
@@ -99,9 +154,8 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, backgroundText = '', 
     // 背景にお手本文字をうっすら描画 (なぞり書きと全く同じSVGパスを使用)
     if (showBackgroundText && backgroundText) {
       ctx.save();
-      const charData = strokeDataJson[backgroundText];
       
-      if (charData && charData.paths && charData.paths.length > 0) {
+      if (backgroundPaths && backgroundPaths.length > 0) {
         // なぞり書き(KanjiVG)のSVGパスと同じ形状でキャンバスに描画
         const svgSize = 109; // KanjiVGの基準サイズ
         const scale = (width * 0.76) / svgSize;
@@ -115,12 +169,12 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, backgroundText = '', 
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         
-        charData.paths.forEach(pathStr => {
+        backgroundPaths.forEach(pathStr => {
           const path = new Path2D(pathStr);
           ctx.stroke(path);
         });
       } else {
-        // 万が一パスデータが無い場合のフォールバック（フォント描画）
+        // パスデータ取得中またはオフライン時のフォールバック（フォント描画）
         ctx.font = `bold ${width * 0.65}px 'Kosugi Maru', sans-serif`;
         ctx.fillStyle = 'rgba(226, 232, 240, 0.55)';
         ctx.textAlign = 'center';
