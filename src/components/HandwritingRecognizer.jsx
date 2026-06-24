@@ -29,10 +29,22 @@ const HandwritingRecognizer = ({ expectedAnswer, onResult, backgroundText = '', 
     drawBackground(ctx, rect.width, rect.height);
   }, []);
 
+  // 前の文字を追跡して、文字が切り替わったことを検知する
+  const lastTextRef = useRef(backgroundText);
+
   // 背景の文字や表示設定が変わった時に背景を更新し、描画済みのインクも再描画する
   useEffect(() => {
     if (ctxRef.current && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
+      
+      // 対象の文字（backgroundText）が変わった場合は、インクデータをクリアする（次の文字へ進んだ時の自動クリア）
+      if (lastTextRef.current !== backgroundText) {
+        inkRef.current = [];
+        currentStrokeRef.current = [[], [], []];
+        setHasInk(false);
+        lastTextRef.current = backgroundText;
+      }
+
       drawBackground(ctxRef.current, rect.width, rect.height);
       reDrawInk();
     }
